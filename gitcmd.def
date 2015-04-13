@@ -1,0 +1,10 @@
+EXPORTS
+	ContentGetDetectString
+	ContentGetSupportedField
+	ContentGetValue
+	ContentSetDefaultParams
+	ContentStopGetValue
+	ContentGetSupportedFieldFlags
+	ContentGetDefaultSortOrder
+	ContentSetValue
+	ContentCompareFiles

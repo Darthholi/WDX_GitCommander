@@ -1,0 +1,5 @@
+USEUNIT("gitcmd.cpp");
+USERES("gitcmd.RES");
+USEDEF("gitcmd.def");
+//---------------------------------------------------------------------------
+#define DllEntryPoint
