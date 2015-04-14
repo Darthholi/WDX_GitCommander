@@ -23,3 +23,5 @@ Option b) Last commit affecting given file (or last commit info for folders)
 In the future I would like to make it with better installators and so. If you love total commander, feel free to do it faster than me.
 
 Martin.
+
+PS: Thread on the totalcommander site: http://www.ghisler.ch/board/viewtopic.php?t=42074
