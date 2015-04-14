@@ -14,10 +14,14 @@ Just go to Configuration->Display and down there on the setting page tick some b
 Then it just remains to add a rule for all files "*" with this formatting:
 
 Option a) last commit info:
+```
 [=gitcmd.Branch]([=gitcmd.CommitAge]) [=gitcmd.FirstRemoteUrl]\n[=gitcmd.CommitMessage]\n[=gitcmd.CommitAuthor] [=gitcmd.CommitMail] [=gitcmd.CommitDate.D.M.Y h:m:s]
+```
 
 Option b) Last commit affecting given file (or last commit info for folders)
+```
 [=gitcmd.Branch] [=gitcmd.FirstRemoteUrl]\n[=gitcmd.FallIsLast] [=gitcmd.FallAge]\n[=gitcmd.FallMessage]\n[=gitcmd.FallAuthor] [=gitcmd.FallMail] [=gitcmd.FallDate.D.M.Y h:m:s]\n[=gitcmd.GeneralStatus]
+```
 
 
 In the future I would like to make it with better installators and so. If you love total commander, feel free to do it faster than me.
