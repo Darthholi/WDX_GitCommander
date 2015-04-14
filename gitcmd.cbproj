@@ -3,7 +3,7 @@
 			<ProjectGuid>{1EF3F870-C8B1-4A9A-B8D7-BF6094A884C9}</ProjectGuid>
 			<ProjectType>CppDynamicLibrary</ProjectType>
 			<Base>True</Base>
-			<Config Condition="'$(Config)'==''">Debug</Config>
+			<Config Condition="'$(Config)'==''">Release</Config>
 			<ProjectVersion>12.3</ProjectVersion>
 			<Platform>Win32</Platform>
 			<AppType>Library</AppType>

@@ -5,8 +5,6 @@
 1429020378|cmdtest/cmdtest.cpp
 1428996318|cmdtest/projtest.cbproj
 1428996320|cmdtest/projtest.cbproj.local
-1428945832|gitcmd.cbproj
-1429020576|gitcmd.cpp
 1427181044|libgit2-0.22.2/.HEADER
 1427181044|libgit2-0.22.2/.editorconfig
 1427181044|libgit2-0.22.2/.mailmap
@@ -980,3 +978,6 @@
 1427181044|libgit2-0.22.2/tests/transport/register.c
 1427181044|libgit2-0.22.2/tests/valgrind-supp-mac.txt
 1428998878|uGitForBCB.h
+1429047730|Release.zip
+1429045258|gitcmd.cbproj
+1429047622|gitcmd.cpp

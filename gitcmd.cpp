@@ -1,19 +1,18 @@
-// gitcmd.cpp : Defines the entry point for the DLL application.
+// gitcmd.cpp : Gitcommander plugin for total commander
 //
-//posunu li sloupec doelva a nic do nej nenapisu, zustane info z predchoziho sloupce. TO se muze hodit.
-//nahradit datum datumem posledniho predchoziho commitu
 //pluginst.inf
-//plugman protoze neni schvalenej plugin.
-//jmeno a pripona nejdou odstranit ale kdyz budu zobrazovat nazev vetve tak ho muzu zobrazit prez priponu
-
+//
+//Ideas from:
 //https://github.com/libgit2/GitForDelphi/blob/binary/tests/git2.dll
 //https://github.com/libgit2/GitForDelphi
-
-//pridat cache poslednich nekolika .git repozitaru a reference na nej.
-//cleaning kdyz se otevre jiny, nebo kdyz se zavre dll.
-//filestatus otestovat nejde protoze potrebuje jmeno toho souboru...
-//format o vou commitech
-//GIT: [=gitcmd.FirstRemoteUrl]\n [=gitcmd.CurrentBranch] ([=gitcmd.CommitAge])\n[=gitcmd.CommitMessage]\n[=gitcmd.CommitDate.D.M.Y] [=gitcmd.CommitAuthor.name] [=gitcmd.CommitAuthor.email]\n File [=gitcmd.FileStatus]\n[=gitcmd.LastAuthor.email]([=gitcmd.LastCommitAge]): [=gitcmd.LastCommitMessage]
+//
+//Usage - hints in TC
+//first format - last commit info:
+//[=gitcmd.Branch]([=gitcmd.CommitAge]) [=gitcmd.FirstRemoteUrl]\n[=gitcmd.CommitMessage]\n[=gitcmd.CommitAuthor] [=gitcmd.CommitMail] [=gitcmd.CommitDate.D.M.Y h:m:s]
+//last format different for dires and for files: (authors choice)
+//[=gitcmd.Branch] [=gitcmd.FirstRemoteUrl]\n[=gitcmd.FallIsLast] [=gitcmd.FallAge]\n[=gitcmd.FallMessage]\n[=gitcmd.FallAuthor] [=gitcmd.FallMail] [=gitcmd.FallDate.D.M.Y h:m:s]\n[=gitcmd.GeneralStatus]
+//
+//Usage - Column with branch instead of DIR - SizeAndBranch
 
 //if C++ builder5:
 #define _BCB
@@ -37,86 +36,97 @@
 #include "time.h"
 #include <sys/stat.h>
 #endif
+//about the files - the lib is compiled libgit2
+//the uGitForBCB.h is ripped things from git2.h because I was not able to incliude them properly (and the idea is based on git for delphi)
+
+//from here on it should be compilable with anything...
+//TODO:
+//-cache pointers to repos
+//-more unicodes, now iam just lucky to have it working
+//-
 
 //rest of normal code:
 #define _detectstring ""
 
-#define fieldcount 37
+#define fieldcount 21
 
+//general info groups:
+enum EGitWantSrc{ENone,EThisCommit,ELastAffecting,ELastFallthrough};//the checkout-commit where we stand, the last commit affected file OR empty, the last commit affected file OR currentcheckout
+enum EGitWant{EMsg,EAuthor,EMail,EDate,EAge,   //can be specified from EGitWantSrc
+EBranch,EFirstRemoteURL,   //no specifiers, just general info
+EFileStatus,//Status for file, empty for dirc
+EGeneralStatus,
+ESizeBranch,
+EFallIsThis
+};
+
+//specific fields: cant be done by formatting because of datetime
+enum EFields{
+EFSizeBranch=0,
+EFThisMsg,EFThisAuthor,EFThisMail,EFThisDate,EFThisAge,   //commit where we stand
+EFLastMsg,EFLastAuthor,EFLastMail,EFLastDate,EFLastAge,   //last commit affecting file or empty string
+EFFallMsg,EFFallAuthor,EFFallMail,EFFallDate,EFFallAge,   //last commit affecting file or commit where we stand
+EFBranch,EFFirstRemoteURL,   //no specifiers, just general info
+EFFileStatus,//Status for file, empty for dirc
+EFGeneralStatus, //File+Status for files, "GIT dir." for dirs.
+EFFallIsThis
+};
 char* fieldnames[fieldcount]={
-	"name",
   "SizeAndBranch",                                                                 //Branch instead of <DIR>
-  "creationdate","creationtime",
-	"writedate","writetime","accessdate","accesstime",
-	"attributes","attrstr",
-	"archive","read only","hidden","system",
-	"compressed","encrypted","sparse",
-	"versionstring","versionnr","file type","random nr",
-	"CutNameStart","DayOfYear","PathLenAnsi","PathLenUnicode",
-	"JPG+RAW present",
-  "CommitMessage", "CurrentBranch", "CommitAuthor", "CommitDate", "CommitAge",    //functionality for whole repo, commit we are standing at
-  "FirstRemoteUrl",                                                               //functionality for whole repo, commit we are standing at
-  "FileStatus",                                                                   //functionality for specific file
-  "LastCommitMessage", "LastAuthor", "LastDate", "LastCommitAge"                  //Last* .. functionality for specific file
+	"CommitMessage","CommitAuthor","CommitMail","CommitDate", "CommitAge",
+  "LastMessage","LastAuthor","LastMail","LastDate", "LastAge",
+  "FallMessage","FallAuthor","FallMail","FallDate", "FallAge",
+  "Branch","FirstRemoteUrl",                                                               //functionality for whole repo, commit we are standing at
+  "FileStatus","GeneralStatus",
+  "FallIsLast"
   };
-
 int fieldtypes[fieldcount]={
-		ft_string,ft_numeric_floating,ft_datetime,ft_time,
-		ft_datetime,ft_time,ft_datetime,ft_time,
-		ft_numeric_32,ft_string,
-		ft_boolean,ft_boolean,ft_boolean,ft_boolean,
-		ft_boolean,ft_boolean,ft_boolean,
-		ft_string,ft_numeric_floating,
-		ft_multiplechoice,ft_numeric_32,ft_string,
-		ft_numeric_32,ft_numeric_32,ft_numeric_32,ft_boolean,
-    ft_string, ft_string, ft_string,ft_datetime,ft_string,
-    ft_string, ft_string,
-    ft_string,ft_string,ft_datetime,ft_string};
-
+		ft_numeric_floating,
+    ft_string,ft_string,ft_string,ft_datetime,ft_string,
+    ft_string,ft_string,ft_string,ft_datetime,ft_string,
+    ft_string,ft_string,ft_string,ft_datetime,ft_string,
+    ft_string,ft_string,
+    ft_string,
+    ft_string,
+    ft_string
+    };
 char* fieldunits_and_multiplechoicestrings[fieldcount]={
-		"","bytes|kbytes|Mbytes|Gbytes","","",
-		"","","","",
+		"bytes|kbytes|Mbytes|Gbytes",
+    "","","","","",
+    "","","","","",
+    "","","","","",
 		"","",
-		"","","","",
-		"","","",
-		"","","file|folder|reparse point","","0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20",
-		"","","","",
-    "","","name|email","","",
-    "","",
-    "","name|email","",""};
+		"",
+		"",
+    ""};
 
 int fieldflags[fieldcount]={
-    0,contflags_passthrough_size_float | contflags_edit,contflags_edit,contflags_edit,
-	contflags_substdate | contflags_edit,contflags_substtime | contflags_edit,contflags_edit,contflags_edit,
-    contflags_substattributes,contflags_substattributestr,
-    0,0,0,0,
-    0,0,0,
-	0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,
-  0,0,0,0};
+    contflags_passthrough_size_float | contflags_edit,
+    0,0,0,0,0,
+    0,0,0,0,0,
+    0,0,0,0,0,
+    0,0,
+    0,0,
+    0
+    };
 
 int sortorders[fieldcount]={
-  1,-1,-1,-1,
-  -1,-1,-1,-1,
+  -1,
+  1,1,1,1,1,
+  1,1,1,1,1,
+  1,1,1,1,1,
   1,1,
-  1,1,1,1,
-  1,1,1,
-  1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,
-  1,1,1,1};
-
-
-char* multiplechoicevalues[3]={
-	"file","folder","reparse point"
-};
+  1,
+  1,
+  1
+  };
 
 BOOL GetValueAborted=false;
 
 
 BOOL APIENTRY DllMain( HANDLE hModule,
                        DWORD  ul_reason_for_call,
-                       LPVOID lpReserved
-					 )
+                       LPVOID lpReserved)
 {
 	if (ul_reason_for_call==DLL_PROCESS_ATTACH)
   {
@@ -374,16 +384,16 @@ PLUGFUNC int __stdcall ContentGetValue(TCHAR* FileName,int FieldIndex,int UnitIn
 	if (_tcslen(FileName)<=3)
     return ft_fileerror;
 
-	if (flags & CONTENT_DELAYIFSLOW) {
+	/*if (flags & CONTENT_DELAYIFSLOW) {
 		if (FieldIndex==17)
 			return ft_delayed;
 		if (FieldIndex==18)
 			return ft_ondemand;
-	}
+	} */
 
 	if (flags & CONTENT_PASSTHROUGH) {
 		switch (FieldIndex) {
-		case 1:  // "size"
+		case EFSizeBranch:
 			filesize=(__int64)*(double*)FieldValue;
 			switch (UnitIndex) {
 			case 1:
@@ -404,29 +414,121 @@ PLUGFUNC int __stdcall ContentGetValue(TCHAR* FileName,int FieldIndex,int UnitIn
 		}
 	}
 
-	if (FieldIndex!=20 && FieldIndex!=23 && FieldIndex!=24)  //not needed for these fields!
+  //parsing what we want:
+  EGitWant xWant;
+  EGitWantSrc xWantFrom=ENone;
+  switch (FieldIndex)
+  {
+    default:
+    return ft_nosuchfield;
+    break;
+    case EFSizeBranch: xWant=ESizeBranch; break;
+    case EFBranch: xWant=EBranch; break;
+    case EFFirstRemoteURL: xWant=EFirstRemoteURL; break;
+    case EFFileStatus: xWant=EFileStatus; break;
+    case EFGeneralStatus: xWant=EGeneralStatus; break;
+    case EFFallIsThis: xWant=EFallIsThis; xWantFrom=ELastFallthrough; break;
+    case EFThisMsg:
+    case EFThisAuthor:
+    case EFThisMail:
+    case EFThisDate:
+    case EFThisAge:
+      xWant=EMsg+(FieldIndex-EFThisMsg);
+      xWantFrom=EThisCommit;
+    break;
+    case EFLastMsg:
+    case EFLastAuthor:
+    case EFLastMail:
+    case EFLastDate:
+    case EFLastAge:
+      xWant=EMsg+(FieldIndex-EFLastMsg);
+      xWantFrom=ELastAffecting;
+    break;
+    case EFFallMsg:
+    case EFFallAuthor:
+    case EFFallMail:
+    case EFFallDate:
+    case EFFallAge:
+      xWant=EMsg+(FieldIndex-EFFallMsg);
+      xWantFrom=ELastFallthrough;
+    break;
+  }
+
+  bool xNeedfd=true; //everybody needs the information if file or directory
+  bool xStdGit= FieldIndex!=EFSizeBranch;//only size is treated differently
+  bool xNeedRepo=true; //everybody (in case xStdGit) needs repo
+  bool xNeedCommit = xWantFrom!=ENone;
+  bool xNeedLastAffCommit= (xWantFrom==ELastFallthrough || xWantFrom==ELastAffecting);
+
+  //finito, now to actually do it.
+
+  if (xNeedfd)
 		fh=FindFirstFile(FileName,&fd);
 	else
 		fh=0;
-	if (fh!=INVALID_HANDLE_VALUE) {
-		if (FieldIndex!=20 && FieldIndex!=23 && FieldIndex!=24)
+	if (fh!=INVALID_HANDLE_VALUE)
+  {
+		if (xNeedfd)
 			FindClose(fh);
-		switch (FieldIndex) {
-		case 0:  //	"name"
-			_tcslcpy((TCHAR*)FieldValue,fd.cFileName,maxlen-1);
-			break;
-    //-------------GIT FUNCTIONALITY-----------------------------------------
-    case 30: //"CommitAge"
-    case 29: //"CommitDatetime"
-    case 28: //"CommitAuthor"
-    case 27: //"CurrentBranch",
-    case 26: //commit message
+
+    if (xStdGit)
     {
       EPositionType xRet;                               //false -> let these functions return something ONLY on directories
-      git_repository *repo = CheckRepo(fd,FileName,xRet,true,NULL);
+      git_repository *repo = NULL;
+      int rc=0;
+      git_commit * commit = NULL; /* the result */
+      git_oid oid_parent_commit;  /* the SHA1 for last commit */
+      git_oid xLastAffecting;
+      git_commit *xFilesCommit = NULL;//the result commit last affecting given file
+      const char *branch = NULL;
+      bool xReturnEmpty=false;
+      bool xDirectory=fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
+      char xBufFN[2048];//filename for git
+
+      if (xNeedRepo)
+        repo=CheckRepo(fd,FileName,xRet,true,xBufFN);
       if (repo)                   //possibility to display different things for different xRet;
-      {
-        if (FieldIndex==27) //"CurrentBranch"
+      {                                            //if (xBufFN[0]!=0)
+        //get commit and commit message
+        /* resolve HEAD into a SHA1 */
+
+        if (xNeedCommit || xNeedLastAffCommit)
+        {
+          rc = git_reference_name_to_id( &oid_parent_commit, repo, "HEAD" );
+          if ( rc == 0 )
+          {
+            /* get the actual commit structure */
+            rc = git_commit_lookup( &commit, repo, &oid_parent_commit );
+            if ( rc == 0 && xNeedLastAffCommit)
+            {
+            //we have the last commit. Now to walk it:
+              if ((xBufFN && xBufFN[0]!=0) && 0==git_commit_entry_last_commit_id(&xLastAffecting,repo,commit,xBufFN))
+              {
+                rc = git_commit_lookup( &xFilesCommit, repo, &xLastAffecting );
+                //if (rc == 0)
+                //{
+                //  //we can do work.
+                //}
+              }
+            }
+          }
+        }
+        if (rc!=0)//error in getting what we wanted
+        {
+          if (fieldtypes[FieldIndex]==ft_string)
+          {
+            const git_error *error = giterr_last();
+            if (error)
+              _tcslcpy((TCHAR*)FieldValue,error->message,maxlen-1);
+            else
+              return ft_fieldempty;
+          }
+          else
+            return ft_fieldempty;
+        }
+
+        //special first and then commit infos.
+        if (xWant==EBranch) //"CurrentBranch"
         {
           int error = 0;
           const char *branch = NULL;
@@ -447,521 +549,238 @@ PLUGFUNC int __stdcall ContentGetValue(TCHAR* FileName,int FieldIndex,int UnitIn
 
           git_reference_free(head);
         }
-        else          //operations with last commit:
+        else if (xWant==EFirstRemoteURL)
         {
-          //get commit and commit message
-          git_commit * commit = NULL; /* the result */
-          git_oid oid_parent_commit;  /* the SHA1 for last commit */
-          /* resolve HEAD into a SHA1 */
-          int rc = git_reference_name_to_id( &oid_parent_commit, repo, "HEAD" );
-          if ( rc == 0 )
+          git_strarray xRs;
+          if (0==git_remote_list(&xRs,repo))
           {
-            /* get the actual commit structure */
-            rc = git_commit_lookup( &commit, repo, &oid_parent_commit );
-            if ( rc == 0 )
+            if (xRs.count>=1)
             {
-              //return commit;
-              switch (FieldIndex)
+              git_remote *remote=NULL;
+              if (0==git_remote_lookup(&remote,repo,xRs.strings[0]))//first repo
               {
-                case 26: //git last commitmessage
+                _tcslcpy((TCHAR*)FieldValue,git_remote_url(remote),maxlen-1);
+                git_remote_free(remote);
+              }
+              else
+                _tcslcpy((TCHAR*)FieldValue,xRs.strings[0],maxlen-1);  //at least the remote name
+            }
+            else
+              _tcslcpy((TCHAR*)FieldValue,"Local rep.",maxlen-1);  //at least the remote name
+
+            git_strarray_free(&xRs);
+          }
+          else
+            return ft_fieldempty;
+        }
+        else if (xWant==EFileStatus || xWant==EGeneralStatus)
+        {
+          TCHAR *xTrgt;
+          if (xWant==EGeneralStatus && xDirectory)
+          {
+            _tcslcpy((TCHAR*)FieldValue,"File ",maxlen-1);
+            xTrgt=(TCHAR*)FieldValue + strlen((TCHAR*)FieldValue);
+          }
+          else xTrgt=(TCHAR*)FieldValue;
+          if ((!xDirectory && xWant==EGeneralStatus) || xWant==EFileStatus)
+          {
+            unsigned int xStatF=0;
+            if ((xBufFN && xBufFN[0]!=0) && 0==git_status_file(&xStatF,repo,xBufFN))
+            {
+              if (xStatF & GIT_STATUS_IGNORED)
+                _tcslcpy(xTrgt,"ignored",maxlen-1);
+              else if (xStatF & GIT_STATUS_WT_NEW)
+                _tcslcpy(xTrgt,"new",maxlen-1);
+              else if (xStatF & GIT_STATUS_WT_MODIFIED)
+                _tcslcpy(xTrgt,"modified",maxlen-1);
+              else if (xStatF & GIT_STATUS_WT_DELETED)
+                _tcslcpy(xTrgt,"deleted",maxlen-1);
+              else if (xStatF & GIT_STATUS_WT_TYPECHANGE)
+                _tcslcpy(xTrgt,"typechange",maxlen-1);
+              else if (xStatF & GIT_STATUS_WT_RENAMED)
+                _tcslcpy(xTrgt,"renamed",maxlen-1);
+              else if (xStatF & GIT_STATUS_WT_UNREADABLE)
+                _tcslcpy(xTrgt,"unreadable",maxlen-1);
+            }
+            if (xStatF==0)//nothing printed or error
+            {
+              //_tcslcpy((TCHAR*)FieldValue,xBufFN,maxlen-1);
+              //_tcslcpy((TCHAR*)FieldValue,git_repository_path(repo),maxlen-1);//debug del.
+              const git_error *error = giterr_last();
+              if (error)
+                _tcslcpy(xTrgt,error->message,maxlen-1);
+              else
+                _tcslcpy(xTrgt,"unchanged",maxlen-1);
+            }
+          }
+          else if (xDirectory && xWant==EGeneralStatus)
+          {
+            _tcslcpy((TCHAR*)FieldValue,"GIT dir",maxlen-1);
+          }
+        }
+        else //info o commitu
+        {
+          //EMsg,EAuthor,EMail,EDate,EAge
+          //EThisCommit,ELastAffecting,ELastFallthrough
+
+          if (xWantFrom==ELastAffecting && xFilesCommit==NULL)
+          {
+            xReturnEmpty=true;
+          }
+          else
+          {
+            git_commit * xPtrUse;
+            if (xWantFrom==EThisCommit || (xWantFrom==ELastFallthrough && xFilesCommit==NULL))
+              xPtrUse=commit;
+            else
+              xPtrUse=xFilesCommit;
+
+            switch (xWant)
+            {              //EMsg,EAuthor,EMail,EDate,EAge
+              case EFallIsThis:
+              {
+                if (xPtrUse==commit)
+                  _tcslcpy((TCHAR*)FieldValue,"This commit",maxlen-1);
+                else
+                  _tcslcpy((TCHAR*)FieldValue,"Last affecting",maxlen-1);
+              }
+              break;
+              case EMsg: //git last commitmessage
+              {
+                char *xCMsg=(char*)git_commit_summary(xPtrUse);//whole message: git_commit_message
+                _tcslcpy((TCHAR*)FieldValue,xCMsg,maxlen-1);
+              }
+              break;
+              case EAuthor: //"CommitAuthor"
+              case EMail:
+              {
+                const git_signature *xSig=git_commit_author(xPtrUse);
+                if (xSig)
                 {
-                  char *xCMsg=(char*)git_commit_summary(commit);//whole message: git_commit_message
-                  _tcslcpy((TCHAR*)FieldValue,xCMsg,maxlen-1);
-                }
-                break;
-                case 28: //"CommitAuthor"
-                {
-                  const git_signature *xSig=git_commit_author(commit);
-                  if (xSig)
+                  switch (xWant)
                   {
-                    switch (UnitIndex)
-                    {
-                    case 0:        //name
+                    case EAuthor:        //name
                       _tcslcpy((TCHAR*)FieldValue,xSig->name,maxlen-1);
-                      break;
-                    case 1:       //email
+                    break;
+                    case EMail:       //email
                       _tcslcpy((TCHAR*)FieldValue,xSig->email,maxlen-1);
-                      break;
-                    }
+                    break;
                   }
                 }
-                break;
-                case 29: //"CommitDatetime"
-                {
-                  git_time_t comtim=git_commit_time(commit);
-                  int origoffset=git_commit_time_offset(commit);
-                  TimetToFileTime(comtim, ((FILETIME*)FieldValue));
-                }
-                break;
-                case 30: //"CommitAge"
-                {
-                  git_time_t comtim=git_commit_time(commit);
-                  time_t xNow;
-                  time(&xNow);
-                  double xAgo=difftime(xNow, comtim);//difference in seconds
-                  PrintTimeAgo((TCHAR*)FieldValue,xAgo,maxlen);
-                }
-                break;
               }
-
-              git_commit_free(commit);
-            }
-          }
-        }
-        ByeRepo(repo);
-      }
-      else
-        return ft_fieldempty;
-    }
-    break;
-    case 31: //"FirstRemoteUrl"
-    {
-      EPositionType xRet;
-      git_repository *repo = CheckRepo(fd,FileName,xRet,true,NULL);
-      if (repo)
-      {
-        git_strarray xRs;
-        if (0==git_remote_list(&xRs,repo))
-        {
-          if (xRs.count>=1)
-          {
-            git_remote *remote=NULL;
-            if (0==git_remote_lookup(&remote,repo,xRs.strings[0]))//first repo
-            {
-              _tcslcpy((TCHAR*)FieldValue,git_remote_url(remote),maxlen-1);
-              git_remote_free(remote);
-            }
-            else
-              _tcslcpy((TCHAR*)FieldValue,xRs.strings[0],maxlen-1);  //at least the remote name
-          }
-          else
-            _tcslcpy((TCHAR*)FieldValue,"Local rep.",maxlen-1);  //at least the remote name
-
-          git_strarray_free(&xRs);
-        }
-        ByeRepo(repo);
-      }
-      else return ft_fieldempty;
-    }
-    break;
-    case 32: //"FileStatus"        //possible formatting - index or working tree.
-    {
-      if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)  //only for files
-        return ft_fieldempty;
-
-      EPositionType xRet;
-      char xBufFN[2048];//filename for git
-      git_repository *repo = CheckRepo(fd,FileName,xRet,true,xBufFN);
-      if (repo && xBufFN[0]!=0)
-      {
-        git_strarray xRs;
-        unsigned int xStatF=0;
-        if (0==git_status_file(&xStatF,repo,xBufFN)) //+strlen(git_repository_path(repo))
-        {
-          if (xStatF & GIT_STATUS_IGNORED)
-            _tcslcpy((TCHAR*)FieldValue,"ignored",maxlen-1);
-          else if (xStatF & GIT_STATUS_WT_NEW)
-            _tcslcpy((TCHAR*)FieldValue,"new",maxlen-1);
-          else if (xStatF & GIT_STATUS_WT_MODIFIED)
-            _tcslcpy((TCHAR*)FieldValue,"modified",maxlen-1);
-          else if (xStatF & GIT_STATUS_WT_DELETED)
-            _tcslcpy((TCHAR*)FieldValue,"deleted",maxlen-1);
-          else if (xStatF & GIT_STATUS_WT_TYPECHANGE)
-            _tcslcpy((TCHAR*)FieldValue,"typechange",maxlen-1);
-          else if (xStatF & GIT_STATUS_WT_RENAMED)
-            _tcslcpy((TCHAR*)FieldValue,"renamed",maxlen-1);
-          else if (xStatF & GIT_STATUS_WT_UNREADABLE)
-            _tcslcpy((TCHAR*)FieldValue,"unreadable",maxlen-1);
-        }
-        if (xStatF==0)//nothing printed or error
-        {
-          //_tcslcpy((TCHAR*)FieldValue,xBufFN,maxlen-1);
-          //_tcslcpy((TCHAR*)FieldValue,git_repository_path(repo),maxlen-1);//debug del.
-          const git_error *error = giterr_last();
-          if (error)
-            _tcslcpy((TCHAR*)FieldValue,error->message,maxlen-1);
-          else
-            _tcslcpy((TCHAR*)FieldValue,"unchanged",maxlen-1);
-        }
-        ByeRepo(repo);
-      }
-      else
-        return ft_fieldempty;
-    }
-    break;
-    // ---- based on: https://github.com/libgit2/libgit2sharp/issues/89 --- :
-    // it is said to beslow so use only in TC hints AND NOT IN COLUMNS
-    case 33://  "LastCommitMessage",
-    case 34://"LastAuthor",
-    case 35://"LastDate",
-    case 36://"LastCommitAge"
-    {
-      EPositionType xRet;
-      char xBufFN[2048];
-      git_repository *repo = CheckRepo(fd,FileName,xRet,true,xBufFN);
-      if (repo && xBufFN[0]!=0)                   //possibility to display different things for different xRet;
-      {
-        //get commit and commit message
-        git_commit * commit = NULL; /* the result */
-        git_oid oid_parent_commit;  /* the SHA1 for last commit */
-        /* resolve HEAD into a SHA1 */
-        int rc = git_reference_name_to_id( &oid_parent_commit, repo, "HEAD" );
-        if ( rc == 0 )
-        {
-          /* get the actual commit structure */
-          rc = git_commit_lookup( &commit, repo, &oid_parent_commit );
-          if ( rc == 0 )
-          {
-            //we have the last commit. Now to walk it:
-            git_oid xLastAffecting;
-            git_commit *xFilesCommit = NULL;
-            if (0==git_commit_entry_last_commit_id(&xLastAffecting,repo,commit,xBufFN))
-            {
-              rc = git_commit_lookup( &xFilesCommit, repo, &xLastAffecting );
-              if (rc == 0)
+              break;
+              case EDate: //"CommitDatetime"
               {
-                switch (FieldIndex)
-                {
-                  case 33://  "LastCommitMessage",
-                  {
-                    char *xCMsg=(char*)git_commit_summary(xFilesCommit);//whole message: git_commit_message
-                    _tcslcpy((TCHAR*)FieldValue,xCMsg,maxlen-1);
-                  }
-                  break;
-                  case 34://"LastAuthor",
-                  {
-                    const git_signature *xSig=git_commit_author(xFilesCommit);
-                    if (xSig)
-                    {
-                      switch (UnitIndex)
-                      {
-                      case 0:        //name
-                        _tcslcpy((TCHAR*)FieldValue,xSig->name,maxlen-1);
-                        break;
-                      case 1:       //email
-                        _tcslcpy((TCHAR*)FieldValue,xSig->email,maxlen-1);
-                        break;
-                      }
-                    }
-                  }
-                  break;
-                  case 35://"LastDate",
-                  {
-                    git_time_t comtim=git_commit_time(xFilesCommit);
-                    int origoffset=git_commit_time_offset(xFilesCommit);
-                    TimetToFileTime(comtim, ((FILETIME*)FieldValue));
-                  }
-                  break;
-                  case 36://"LastCommitAge"
-                  {
-                    time_t xNow;
-                    double xAgo;
-                    try
-                    {
-                    git_time_t comtim=git_commit_time(xFilesCommit);
-                    //time_t xNow;
-                    time(&xNow);
-                    /*double */xAgo=difftime(xNow, comtim);//difference in seconds
-                    }
-                    catch (...)
-                    {
-                      _tcslcpy((TCHAR*)FieldValue,"chyba tak obecne",maxlen-1);
-                    }
-                    try
-                    {
-                      PrintTimeAgo((TCHAR*)FieldValue,xAgo,maxlen);
-                    }
-                    catch (...)
-                    {
-                      _tcslcpy((TCHAR*)FieldValue,"chyba v printtimeago",maxlen-1);
-                    }
-                  }
-                  break;
-                }
-                git_commit_free(xFilesCommit);
+                git_time_t comtim=git_commit_time(xPtrUse);
+                int origoffset=git_commit_time_offset(xPtrUse);
+                TimetToFileTime(comtim, ((FILETIME*)FieldValue));
               }
+              break;
+              case EAge: //"CommitAge"
+              {
+                git_time_t comtim=git_commit_time(xPtrUse);
+                time_t xNow;
+                time(&xNow);
+                double xAgo=difftime(xNow, comtim);//difference in seconds
+                PrintTimeAgo((TCHAR*)FieldValue,xAgo,maxlen);
+              }
+              break;
             }
-            git_commit_free(commit);
           }
         }
+
+        //cleanup:
+        if (xFilesCommit)
+          git_commit_free(xFilesCommit);
+        if (commit)
+          git_commit_free(commit);
         ByeRepo(repo);
-        if (rc!=0) return ft_fieldempty;
+
+        if (xReturnEmpty)
+          return ft_fieldempty;
       }
-      else
+      else                         //else neni repo nevracime nic.
         return ft_fieldempty;
     }
-    break;
-		case 1:  // "size"  + SPECIAL FOR GIT
-			filesize=fd.nFileSizeHigh;
-			filesize=(filesize<<32) + fd.nFileSizeLow;
-			switch (UnitIndex) {
-			case 1:
-				filesize/=1024;
-				break;
-			case 2:
-				filesize/=(1024*1024);
-				break;
-			case 3:
-				filesize/=(1024*1024*1024);
-				break;
-			}
-			//*(__int64*)FieldValue=filesize;
-      *(double*)FieldValue=filesize;
-			// alternate string
-      if (maxlen>12)
+    else//operace mimo GIT.
+    {
+      switch (FieldIndex)
       {
-        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))  //for files:
+        case EFSizeBranch:  // "size"  + SPECIAL FOR GIT
         {
-          strlcpy(((char*)FieldValue)+8,number_fmt(filesize).c_str(),maxlen-8-1);
-        }
-        else //  if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)//String to display... now this is the magic
-        {
-          EPositionType xRet;
-          git_repository *repo = CheckRepo(fd,FileName,xRet,false,NULL);//false - will not slow down if needs to find repo
-          bool xGitPrinted=false;
-          if (repo)                   //possibility to display different things for different xRet;
-          {
-            int error = 0;
-            const char *branch = NULL;
-            git_reference *head = NULL;
-
-            error = git_repository_head(&head, repo);
-
-            if (error == GIT_EUNBORNBRANCH || error == GIT_ENOTFOUND)
-              branch = NULL;
-            else if (!error) {
-              branch = git_reference_shorthand(head);
-            }
-
-            if (branch)
-              strlcpy(((char*)FieldValue)+8,branch,maxlen-8-1);
-            else
-              strlcpy(((char*)FieldValue)+8,"[HEAD]",maxlen-8-1);
-
-            git_reference_free(head);
-            ByeRepo(repo);
-            xGitPrinted=true;
+          filesize=fd.nFileSizeHigh;
+          filesize=(filesize<<32) + fd.nFileSizeLow;
+          switch (UnitIndex) {
+          case 1:
+            filesize/=1024;
+            break;
+          case 2:
+            filesize/=(1024*1024);
+            break;
+          case 3:
+            filesize/=(1024*1024*1024);
+            break;
           }
-          if (!xGitPrinted)
-            strlcpy(((char*)FieldValue)+8,"<DIR>",maxlen-8-1);
+          //*(__int64*)FieldValue=filesize;
+          *(double*)FieldValue=filesize;
+          // alternate string
+          if (maxlen>12)
+          {
+            if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))  //for files:
+            {
+              strlcpy(((char*)FieldValue)+8,number_fmt(filesize).c_str(),maxlen-8-1);
+            }
+            else //  if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)//String to display... now this is the magic
+            {
+              EPositionType xRet;
+              git_repository *repo = CheckRepo(fd,FileName,xRet,false,NULL);//false - will not slow down if needs to find repo
+              bool xGitPrinted=false;
+              if (repo)                   //possibility to display different things for different xRet;
+              {
+                int error = 0;
+                const char *branch = NULL;
+                git_reference *head = NULL;
+
+                error = git_repository_head(&head, repo);
+
+                if (error == GIT_EUNBORNBRANCH || error == GIT_ENOTFOUND)
+                  branch = NULL;
+                else if (!error) {
+                  branch = git_reference_shorthand(head);
+                }
+
+                if (branch)
+                  strlcpy(((char*)FieldValue)+8,branch,maxlen-8-1);
+                else
+                  strlcpy(((char*)FieldValue)+8,"[HEAD]",maxlen-8-1);
+
+                git_reference_free(head);
+                ByeRepo(repo);
+                xGitPrinted=true;
+              }
+              if (!xGitPrinted)
+                strlcpy(((char*)FieldValue)+8,"<DIR>",maxlen-8-1);
+            }
+          }
         }
+        break;
+        default:
+          return ft_nosuchfield;
       }
-			break;
-    //--------END GIT--------------------------------------------------------
-		case 2:  // "creationdate"
-			FileTimeToLocalFileTime(&fd.ftCreationTime,&lt);
-			/*FileTimeToSystemTime(&lt,&st);
-			((pdateformat)FieldValue)->wYear=st.wYear;
-			((pdateformat)FieldValue)->wMonth=st.wMonth;
-			((pdateformat)FieldValue)->wDay=st.wDay;*/
-      *((FILETIME*)FieldValue)=lt;//lepsi, ma vic moznosti v novejch commanderech nastaveni formatovani.
-			break;
-		case 3:  // "creationtime",
-			FileTimeToLocalFileTime(&fd.ftCreationTime,&lt);
-			FileTimeToSystemTime(&lt,&st);
-			((ptimeformat)FieldValue)->wHour=st.wHour;
-			((ptimeformat)FieldValue)->wMinute=st.wMinute;
-			((ptimeformat)FieldValue)->wSecond=st.wSecond;
-			break;
-		case 4:  // "writedate"
-			FileTimeToLocalFileTime(&fd.ftLastWriteTime,&lt);
-			/*FileTimeToSystemTime(&lt,&st);
-			((pdateformat)FieldValue)->wYear=st.wYear;
-			((pdateformat)FieldValue)->wMonth=st.wMonth;
-			((pdateformat)FieldValue)->wDay=st.wDay;       */
-      *((FILETIME*)FieldValue)=lt;//lepsi, ma vic moznosti v novejch commanderech nastaveni formatovani.
-			break;
-		case 5:  // "writetime"
-			FileTimeToLocalFileTime(&fd.ftLastWriteTime,&lt);
-			FileTimeToSystemTime(&lt,&st);
-			((ptimeformat)FieldValue)->wHour=st.wHour;
-			((ptimeformat)FieldValue)->wMinute=st.wMinute;
-			((ptimeformat)FieldValue)->wSecond=st.wSecond;
-			break;
-		case 6:  // "accessdate"
-			FileTimeToLocalFileTime(&fd.ftLastAccessTime,&lt);
-			/*FileTimeToSystemTime(&lt,&st);
-			((pdateformat)FieldValue)->wYear=st.wYear;
-			((pdateformat)FieldValue)->wMonth=st.wMonth;
-			((pdateformat)FieldValue)->wDay=st.wDay;*/
-      *((FILETIME*)FieldValue)=lt;//lepsi, ma vic moznosti v novejch commanderech nastaveni formatovani.
-			break;
-		case 7:  // "accesstime",
-			FileTimeToLocalFileTime(&fd.ftLastAccessTime,&lt);
-			FileTimeToSystemTime(&lt,&st);
-			((ptimeformat)FieldValue)->wHour=st.wHour;
-			((ptimeformat)FieldValue)->wMinute=st.wMinute;
-			((ptimeformat)FieldValue)->wSecond=st.wSecond;
-			break;
-		case 8:  // "attributes",
-			*(int*)FieldValue=fd.dwFileAttributes;
-			break;
-		case 9:  // "attributestr",
-			_tcslcpy((TCHAR*)FieldValue,TEXT("----"),maxlen-1);
-			if (fd.dwFileAttributes & FILE_ATTRIBUTE_READONLY) ((TCHAR*)FieldValue)[0]='r';
-			if (fd.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)  ((TCHAR*)FieldValue)[1]='a';
-			if (fd.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)   ((TCHAR*)FieldValue)[2]='h';
-			if (fd.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)  ((TCHAR*)FieldValue)[3]='s';
-			if (fd.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED) _tcsncat((TCHAR*)FieldValue,TEXT("c"),maxlen-1);
-			if (fd.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED) _tcsncat((TCHAR*)FieldValue,TEXT("e"),maxlen-1);
-			break;
-		case 10: // "archive"
-			*(int*)FieldValue=fd.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE;
-			break;
-		case 11: // "read only"
-			*(int*)FieldValue=fd.dwFileAttributes & FILE_ATTRIBUTE_READONLY;
-			break;
-		case 12: // "hidden"
-			*(int*)FieldValue=fd.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN;
-			break;
-		case 13: // "system"
-			*(int*)FieldValue=fd.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM;
-			break;
-		case 14: // "compressed"
-			*(int*)FieldValue=fd.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED;
-			break;
-		case 15: // "encrypted"
-			*(int*)FieldValue=fd.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED;
-			break;
-		case 16: // "sparse"
-			*(int*)FieldValue=fd.dwFileAttributes & FILE_ATTRIBUTE_SPARSE_FILE;
-			break;
-		case 17: // "versionstring"
-		case 18: // "versionnr"
-			dwSize = GetFileVersionInfoSize(FileName, &handle);
-			if(dwSize) {
-				VS_FIXEDFILEINFO *lpBuffer;
-				void *pData=malloc(dwSize);
-				GetFileVersionInfo(FileName, handle, dwSize, pData);
-				if (VerQueryValue(pData, TEXT("\\"), (void **)&lpBuffer, (unsigned int *)&dwSize)) {
-					DWORD verhigh=lpBuffer->dwFileVersionMS >> 16;
-					DWORD verlow=lpBuffer->dwFileVersionMS & 0xFFFF;
-					if (FieldIndex==17) {
-						TCHAR buf[128];
-						DWORD verhigh2=lpBuffer->dwFileVersionLS >> 16;
-						DWORD verlow2=lpBuffer->dwFileVersionLS & 0xFFFF;
-						wsprintf(buf,TEXT("%d.%d.%d.%d"),verhigh,verlow,verhigh2,verlow2);
-						_tcslcpy((TCHAR*)FieldValue,buf,maxlen-1);
-					} else {
-						double version=verlow;
-						while (version>=1)
-							version/=10;
-						version+=verhigh;
-						*(double*)FieldValue=version;
-						// make sure we have the correct DLL
-					}
-				} else {
-					free(pData);
-					return ft_fileerror;
-				}
-				free(pData);
-			} else
-				return ft_fileerror;
-			break;
-		case 19: // "file type"
-			if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)==0)
-				strlcpy((char*)FieldValue,multiplechoicevalues[0],maxlen-1);
-			else if ((fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)==0)
-				strlcpy((char*)FieldValue,multiplechoicevalues[1],maxlen-1);
-			else
-				strlcpy((char*)FieldValue,multiplechoicevalues[2],maxlen-1);
-			break;
-		case 20: // "random nr"
-			*(int*)FieldValue=rand();
-			break;
-		case 21: // "CutNameStart"
-			if (UnitIndex>=0 && (int)_tcslen(fd.cFileName)>UnitIndex)
-				_tcslcpy((TCHAR*)FieldValue,fd.cFileName+UnitIndex,maxlen-1);
-			else
-				((TCHAR*)FieldValue)[0]=0;
-			break;
-		case 22: // "DayOfYear"
-			FileTimeToLocalFileTime(&fd.ftLastWriteTime,&lt);
-			FileTimeToSystemTime(&lt,&st);
-			dayofyear=st.wDay;
-			for (i=1;i<st.wMonth;i++) {
-				dayofyear+=monthdays[i-1];  //array is 0-based
-				if (i==2 && LeapYear(st.wYear))
-					dayofyear++;
-			}
-			*(int*)FieldValue=dayofyear;
-			break;
-		case 23: // "PathLenAnsi"
-#ifdef UNICODE
-			{
-				char abuf[2048];
-				WideCharToMultiByte(CP_ACP,0,FileName,-1,abuf,2047,NULL,NULL);
-				*(int*)FieldValue=strlen(abuf);
-			}
-#else
-			*(int*)FieldValue=_tcslen(FileName);
-#endif
-			break;
-		case 24: // "PathLenUnicode"
-#ifdef UNICODE
-			*(int*)FieldValue=_tcslen(FileName);
-#else
-			{
-				WCHAR wbuf[2048];
-				MultiByteToWideChar(CP_ACP,0,FileName,-1,wbuf,2047);
-				*(int*)FieldValue=wcslen(wbuf);
-			}
-#endif
-			break;
-		case 25:  // RAW+JPG  *.CAM,*.CCD,*.CR2,*.CRW,*.RAW
-			{
-				TCHAR FileName2[MAX_PATH];
-				_tcslcpy(FileName2,FileName,MAX_PATH-1);
-				TCHAR* ext=_tcsrchr(FileName2,'.');
-				if (!ext)
-					return ft_fileerror;
-				if (_tcsicmp(ext,_T(".JPG"))==0) {
-					_tcscpy(ext,_T(".*"));
-					fh=FindFirstFile(FileName2,&fd);
-					if (fh!=INVALID_HANDLE_VALUE) {
-						do {
-							ext=_tcsrchr(fd.cFileName,'.');
-							if (ext!=NULL &&
-							  _tcsicmp(ext,_T(".CAM"))==0 || _tcsicmp(ext,_T(".CCD"))==0 ||
-								_tcsicmp(ext,_T(".CR2"))==0 || _tcsicmp(ext,_T(".CRW"))==0 ||
-								_tcsicmp(ext,_T(".RAW"))==0) {
-								FindClose(fh);
-								*(int*)FieldValue=1;
-								return ft_boolean;
-							}
-						} while (FindNextFile(fh,&fd));
-						FindClose(fh);
-					}
-				} else if (_tcsicmp(ext,_T(".CAM"))==0 || _tcsicmp(ext,_T(".CCD"))==0 ||
-					_tcsicmp(ext,_T(".CR2"))==0 || _tcsicmp(ext,_T(".CRW"))==0 ||
-					_tcsicmp(ext,_T(".RAW"))==0) {
-					_tcscpy(ext,_T(".JPG"));
-					fh=FindFirstFile(FileName2,&fd);
-					if (fh!=INVALID_HANDLE_VALUE) {
-						FindClose(fh);
-						*(int*)FieldValue=1;
-						return ft_boolean;
-					}
-				} else
-					return ft_fileerror;
-				*(int*)FieldValue=0;;
-				return ft_boolean;
-			}
-		default:
-			return ft_nosuchfield;
 		}
 	} else
 		return ft_fileerror;
+
 	int retval=fieldtypes[FieldIndex];  // very important!
 #ifdef UNICODE
 	if (retval==ft_string) {
-		switch (FieldIndex) {
+	/*	switch (FieldIndex) {
 		case 0: // name
 		case 9: // attrstr
 		case 17:// versionstr
-		case 21:// "CutNameStart"
+		case 21:// "CutNameStart"*/
 			retval=ft_stringw;
-		}
+	/*	}*/
 	}
 #endif;
 	return retval;
@@ -984,7 +803,7 @@ PLUGFUNC int __stdcall ContentSetValue(TCHAR* FileName,int FieldIndex,int UnitIn
 		return ft_nosuchfield;
 	else if (fieldflags[FieldIndex] & contflags_edit==0)
 		return ft_nosuchfield;
-	else {
+	/*else {
 		switch (FieldIndex) {
 		case 1:  // size
 			retval=ft_fileerror;
@@ -1051,7 +870,7 @@ PLUGFUNC int __stdcall ContentSetValue(TCHAR* FileName,int FieldIndex,int UnitIn
 			CloseHandle(f);
 			break;
 		}
-	}
+	} */
 	return retval;
 }
 
@@ -1255,3 +1074,163 @@ PLUGFUNC int __stdcall ContentCompareFiles(PROGRESSCALLBACKPROC progresscallback
 }
 
 
+/*
+Orginal example for tcmd
+
+case 2:  // "creationdate"
+			FileTimeToLocalFileTime(&fd.ftCreationTime,&lt);
+      *((FILETIME*)FieldValue)=lt;//lepsi, ma vic moznosti v novejch commanderech nastaveni formatovani.
+			break;
+		case 3:  // "creationtime",
+			FileTimeToLocalFileTime(&fd.ftCreationTime,&lt);
+			FileTimeToSystemTime(&lt,&st);
+			((ptimeformat)FieldValue)->wHour=st.wHour;
+			((ptimeformat)FieldValue)->wMinute=st.wMinute;
+			((ptimeformat)FieldValue)->wSecond=st.wSecond;
+			break;
+		case 4:  // "writedate"
+			FileTimeToLocalFileTime(&fd.ftLastWriteTime,&lt);
+      *((FILETIME*)FieldValue)=lt;//lepsi, ma vic moznosti v novejch commanderech nastaveni formatovani.
+			break;
+		case 5:  // "writetime"
+			FileTimeToLocalFileTime(&fd.ftLastWriteTime,&lt);
+			FileTimeToSystemTime(&lt,&st);
+			break;
+		case 6:  // "accessdate"
+			FileTimeToLocalFileTime(&fd.ftLastAccessTime,&lt);
+      *((FILETIME*)FieldValue)=lt;//lepsi, ma vic moznosti v novejch commanderech nastaveni formatovani.
+			break;
+		case 7:  // "accesstime",
+			FileTimeToLocalFileTime(&fd.ftLastAccessTime,&lt);
+			FileTimeToSystemTime(&lt,&st);
+			((ptimeformat)FieldValue)->wHour=st.wHour;
+			((ptimeformat)FieldValue)->wMinute=st.wMinute;
+			((ptimeformat)FieldValue)->wSecond=st.wSecond;
+			break;
+		case 8:  // "attributes",
+			*(int*)FieldValue=fd.dwFileAttributes;
+			break;
+		/*case 9:  // "attributestr",
+			_tcslcpy((TCHAR*)FieldValue,TEXT("----"),maxlen-1);
+			if (fd.dwFileAttributes & FILE_ATTRIBUTE_READONLY) ((TCHAR*)FieldValue)[0]='r';
+			if (fd.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE)  ((TCHAR*)FieldValue)[1]='a';
+			if (fd.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)   ((TCHAR*)FieldValue)[2]='h';
+			if (fd.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)  ((TCHAR*)FieldValue)[3]='s';
+			if (fd.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED) _tcsncat((TCHAR*)FieldValue,TEXT("c"),maxlen-1);
+			if (fd.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED) _tcsncat((TCHAR*)FieldValue,TEXT("e"),maxlen-1);
+			break;
+		case 17: // "versionstring"
+		case 18: // "versionnr"
+			dwSize = GetFileVersionInfoSize(FileName, &handle);
+			if(dwSize) {
+				VS_FIXEDFILEINFO *lpBuffer;
+				void *pData=malloc(dwSize);
+				GetFileVersionInfo(FileName, handle, dwSize, pData);
+				if (VerQueryValue(pData, TEXT("\\"), (void **)&lpBuffer, (unsigned int *)&dwSize)) {
+					DWORD verhigh=lpBuffer->dwFileVersionMS >> 16;
+					DWORD verlow=lpBuffer->dwFileVersionMS & 0xFFFF;
+					if (FieldIndex==17) {
+						TCHAR buf[128];
+						DWORD verhigh2=lpBuffer->dwFileVersionLS >> 16;
+						DWORD verlow2=lpBuffer->dwFileVersionLS & 0xFFFF;
+						wsprintf(buf,TEXT("%d.%d.%d.%d"),verhigh,verlow,verhigh2,verlow2);
+						_tcslcpy((TCHAR*)FieldValue,buf,maxlen-1);
+					} else {
+						double version=verlow;
+						while (version>=1)
+							version/=10;
+						version+=verhigh;
+						*(double*)FieldValue=version;
+						// make sure we have the correct DLL
+					}
+				} else {
+					free(pData);
+					return ft_fileerror;
+				}
+				free(pData);
+			} else
+				return ft_fileerror;
+			break;
+		case 19: // "file type"
+			if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)==0)
+				strlcpy((char*)FieldValue,multiplechoicevalues[0],maxlen-1);
+			else if ((fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)==0)
+				strlcpy((char*)FieldValue,multiplechoicevalues[1],maxlen-1);
+			else
+				strlcpy((char*)FieldValue,multiplechoicevalues[2],maxlen-1);
+			break;
+		case 22: // "DayOfYear"
+			FileTimeToLocalFileTime(&fd.ftLastWriteTime,&lt);
+			FileTimeToSystemTime(&lt,&st);
+			dayofyear=st.wDay;
+			for (i=1;i<st.wMonth;i++) {
+				dayofyear+=monthdays[i-1];  //array is 0-based
+				if (i==2 && LeapYear(st.wYear))
+					dayofyear++;
+			}
+			*(int*)FieldValue=dayofyear;
+			break;
+		case 23: // "PathLenAnsi"
+#ifdef UNICODE
+			{
+				char abuf[2048];
+				WideCharToMultiByte(CP_ACP,0,FileName,-1,abuf,2047,NULL,NULL);
+				*(int*)FieldValue=strlen(abuf);
+			}
+#else
+			*(int*)FieldValue=_tcslen(FileName);
+#endif
+			break;
+		case 24: // "PathLenUnicode"
+#ifdef UNICODE
+			*(int*)FieldValue=_tcslen(FileName);
+#else
+			{
+				WCHAR wbuf[2048];
+				MultiByteToWideChar(CP_ACP,0,FileName,-1,wbuf,2047);
+				*(int*)FieldValue=wcslen(wbuf);
+			}
+#endif
+			break;
+		case 25:  // RAW+JPG  *.CAM,*.CCD,*.CR2,*.CRW,*.RAW
+			{
+				TCHAR FileName2[MAX_PATH];
+				_tcslcpy(FileName2,FileName,MAX_PATH-1);
+				TCHAR* ext=_tcsrchr(FileName2,'.');
+				if (!ext)
+					return ft_fileerror;
+				if (_tcsicmp(ext,_T(".JPG"))==0) {
+					_tcscpy(ext,_T(".*"));
+					fh=FindFirstFile(FileName2,&fd);
+					if (fh!=INVALID_HANDLE_VALUE) {
+						do {
+							ext=_tcsrchr(fd.cFileName,'.');
+							if (ext!=NULL &&
+							  _tcsicmp(ext,_T(".CAM"))==0 || _tcsicmp(ext,_T(".CCD"))==0 ||
+								_tcsicmp(ext,_T(".CR2"))==0 || _tcsicmp(ext,_T(".CRW"))==0 ||
+								_tcsicmp(ext,_T(".RAW"))==0) {
+								FindClose(fh);
+								*(int*)FieldValue=1;
+								return ft_boolean;
+							}
+						} while (FindNextFile(fh,&fd));
+						FindClose(fh);
+					}
+				} else if (_tcsicmp(ext,_T(".CAM"))==0 || _tcsicmp(ext,_T(".CCD"))==0 ||
+					_tcsicmp(ext,_T(".CR2"))==0 || _tcsicmp(ext,_T(".CRW"))==0 ||
+					_tcsicmp(ext,_T(".RAW"))==0) {
+					_tcscpy(ext,_T(".JPG"));
+					fh=FindFirstFile(FileName2,&fd);
+					if (fh!=INVALID_HANDLE_VALUE) {
+						FindClose(fh);
+						*(int*)FieldValue=1;
+						return ft_boolean;
+					}
+				} else
+					return ft_fileerror;
+				*(int*)FieldValue=0;;
+				return ft_boolean;
+			}
+
+
+      */
