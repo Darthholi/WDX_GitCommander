@@ -1,0 +1,153 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<!-- C++Builder XML Project -->
+<PROJECT>
+  <MACROS>
+    <VERSION value="BCB.05.03"/>
+    <PROJECT value="LibgitBCB.lib"/>
+    <OBJFILES value="src\hash\hash_generic.obj src\hash\hash_win32.obj src\transports\auth.obj 
+      src\transports\auth_negotiate.obj src\transports\cred.obj 
+      src\transports\cred_helpers.obj src\transports\git.obj 
+      src\transports\http.obj src\transports\local.obj src\transports\smart.obj 
+      src\transports\smart_pkt.obj src\transports\smart_protocol.obj 
+      src\transports\ssh.obj src\transports\winhttp.obj src\unix\realpath.obj 
+      src\win32\dir.obj src\win32\error.obj src\win32\findfile.obj 
+      src\win32\map.obj src\xdiff\xdiffi.obj src\xdiff\xemit.obj 
+      src\xdiff\xhistogram.obj src\xdiff\xmerge.obj src\xdiff\xpatience.obj 
+      src\xdiff\xprepare.obj src\xdiff\xutils.obj src\annotated_commit.obj 
+      src\attr.obj src\attr_file.obj src\attrcache.obj src\blame.obj 
+      src\blame_git.obj src\blob.obj src\branch.obj src\buf_text.obj 
+      src\buffer.obj src\cache.obj src\clone.obj src\commit.obj 
+      src\commit_list.obj src\config.obj src\config_cache.obj 
+      src\config_file.obj src\crlf.obj src\date.obj src\delta.obj 
+      src\delta-apply.obj src\describe.obj src\diff.obj src\diff_driver.obj 
+      src\diff_file.obj src\diff_patch.obj src\diff_print.obj src\diff_stats.obj 
+      src\diff_tform.obj src\diff_xdiff.obj src\errors.obj src\fetch.obj 
+      src\fetchhead.obj src\filebuf.obj src\fileops.obj src\filter.obj 
+      src\fnmatch.obj src\global.obj src\graph.obj src\hash.obj src\hashsig.obj 
+      src\checkout.obj src\cherrypick.obj src\ident.obj src\ignore.obj 
+      src\index.obj src\indexer.obj src\iterator.obj src\merge.obj 
+      src\merge_file.obj src\message.obj src\mwindow.obj src\netops.obj 
+      src\notes.obj src\object.obj src\object_api.obj src\odb.obj 
+      src\odb_loose.obj src\odb_mempack.obj src\odb_pack.obj src\oid.obj 
+      src\oidarray.obj src\openssl_stream.obj src\pack.obj src\pack-objects.obj 
+      src\path.obj src\pathspec.obj src\pool.obj src\posix.obj src\pqueue.obj 
+      src\push.obj src\rebase.obj src\refdb.obj src\refdb_fs.obj src\reflog.obj 
+      src\refs.obj src\refspec.obj src\remote.obj src\repository.obj 
+      src\reset.obj src\revert.obj src\revparse.obj src\revwalk.obj 
+      src\settings.obj src\sha1_lookup.obj src\signature.obj 
+      src\socket_stream.obj src\sortedcache.obj src\stash.obj src\status.obj 
+      src\strmap.obj src\submodule.obj src\sysdir.obj src\tag.obj 
+      src\thread-utils.obj src\trace.obj src\transaction.obj src\transport.obj 
+      src\tree.obj src\tree-cache.obj src\tsort.obj src\util.obj src\vector.obj 
+      src\zstream.obj"/>
+    <RESFILES value=""/>
+    <IDLFILES value=""/>
+    <IDLGENFILES value=""/>
+    <DEFFILE value=""/>
+    <RESDEPEN value="$(RESFILES)"/>
+    <LIBFILES value=""/>
+    <LIBRARIES value=""/>
+    <PACKAGES value=""/>
+    <PATHCPP value=".;src\hash;src\transports;src\unix;src\win32;src\xdiff;src"/>
+    <PATHPAS value=".;"/>
+    <PATHRC value=".;"/>
+    <PATHASM value=".;"/>
+    <LINKER value="TLib"/>
+    <USERDEFINES value="_DEBUG;_BCB"/>
+    <SYSDEFINES value="_RTLDLL;NO_STRICT"/>
+    <MAINSOURCE value="LibgitBCB.bpf"/>
+    <INCLUDEPATH value="$(BCB)\include;$(BCB)\include\vcl;src;src\xdiff;src\win32;src\unix;src\transports;src\hash;include;include\git2"/>
+    <LIBPATH value="src;src\xdiff;src\win32;src\unix;src\transports;src\hash;$(BCB)\lib\obj;$(BCB)\lib"/>
+    <WARNINGS value="-w-par"/>
+    <LISTFILE value=""/>
+  </MACROS>
+  <OPTIONS>
+    <IDLCFLAGS value="-I$(BCB)\include -I$(BCB)\include\vcl -Isrc -Isrc\xdiff -Isrc\win32 
+      -Isrc\unix -Isrc\transports -Isrc\hash -Iinclude -Iinclude\git2 
+      -src_suffix cpp -D_DEBUG -D_BCB 1800 1800 1600 -boa"/>
+    <CFLAG1 value="-Od -H=$(BCB)\lib\vcl50.csm -Hc -Vx -Ve -X- -r- -a8 -b- -k -y -v -vi- -c 
+      -tW -tWM"/>
+    <PFLAGS value="-$YD -$W -$O- -v -JPHNE -M"/>
+    <AFLAGS value="/mx /w2 /zd"/>
+    <LFLAGS value=""/>
+  </OPTIONS>
+  <LINKER>
+    <ALLOBJ value="$(OBJFILES)"/>
+    <ALLLIB value=""/>
+  </LINKER>
+  <IDEOPTIONS>
+[Version Info]
+IncludeVerInfo=0
+AutoIncBuild=0
+MajorVer=1
+MinorVer=0
+Release=0
+Build=0
+Debug=0
+PreRelease=0
+Special=0
+Private=0
+DLL=0
+Locale=1029
+CodePage=1250
+
+[Version Info Keys]
+CompanyName=
+FileDescription=
+FileVersion=1.0.0.0
+InternalName=
+LegalCopyright=
+LegalTrademarks=
+OriginalFilename=
+ProductName=
+ProductVersion=1.0.0.0
+Comments=
+
+[HistoryLists\hlIncludePath]
+Count=3
+Item0=$(BCB)\include;$(BCB)\include\vcl;src;src\xdiff;src\win32;src\unix;src\transports;src\hash;include;include\git2
+Item1=src;src\xdiff;src\win32;src\unix;src\transports;src\hash;$(BCB)\include;$(BCB)\include\vcl;include;include\git2
+Item2=src;src\xdiff;src\win32;src\unix;src\transports;src\hash;$(BCB)\include;$(BCB)\include\vcl
+
+[HistoryLists\hlLibraryPath]
+Count=1
+Item0=src;src\xdiff;src\win32;src\unix;src\transports;src\hash;$(BCB)\lib\obj;$(BCB)\lib
+
+[HistoryLists\hlDebugSourcePath]
+Count=1
+Item0=$(BCB)\source\vcl
+
+[HistoryLists\hlConditionals]
+Count=6
+Item0=_DEBUG;_BCB
+Item1=_DEBUG;_BCB;_MSC_VER
+Item2=_DEBUG;_MSC_VER
+Item3=_DEBUG
+Item4=_DEBUG;_MSC_VER 1800
+Item5=_DEBUG;_MSC_VER 1600
+
+[HistoryLists\hlTlibPageSize]
+Count=1
+Item0=0x0010
+
+[Debugging]
+DebugSourceDirs=$(BCB)\source\vcl
+
+[Parameters]
+RunParams=
+HostApplication=
+RemoteHost=
+RemotePath=
+RemoteDebug=0
+
+[Compiler]
+ShowInfoMsgs=0
+LinkDebugVcl=0
+LinkCGLIB=0
+
+[CORBA]
+AddServerUnit=1
+AddClientUnit=1
+PrecompiledHeaders=1
+  </IDEOPTIONS>
+</PROJECT>

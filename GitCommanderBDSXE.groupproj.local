@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>1899.12.30 00:00:00.000.957,D:\Data\Projects\TotalCmdPlugs\wdx_gitcmd\ProjectGroup1.groupproj=D:\Data\Projects\TotalCmdPlugs\wdx_gitcmd\GitCommanderBDSXE.groupproj</Transaction>
+  </Transactions>
+	<Default.Personality>
+		<Projects ActiveProject="D:\Data\Projects\TotalCmdPlugs\wdx_gitcmd\gitcmd.cbproj"/>
+	</Default.Personality>
+</BorlandProject>

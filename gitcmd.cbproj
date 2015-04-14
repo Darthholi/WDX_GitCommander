@@ -3,7 +3,7 @@
 			<ProjectGuid>{1EF3F870-C8B1-4A9A-B8D7-BF6094A884C9}</ProjectGuid>
 			<ProjectType>CppDynamicLibrary</ProjectType>
 			<Base>True</Base>
-			<Config Condition="'$(Config)'==''">Release</Config>
+			<Config Condition="'$(Config)'==''">Debug</Config>
 			<ProjectVersion>12.3</ProjectVersion>
 			<Platform>Win32</Platform>
 			<AppType>Library</AppType>
@@ -35,7 +35,7 @@
 			<DCC_ObjOutput>Release\</DCC_ObjOutput>
 			<DCC_DcuOutput>Release\</DCC_DcuOutput>
 			<TASM_AdditionalSwitches> /w2 Release\</TASM_AdditionalSwitches>
-			<ILINK_LibraryPath>..\..\libgit\libgit2-0.22.2\;$(BDS)\lib;$(BDS)\lib\psdk;$(BDS)\lib\obj;$(BDS)\lib\psdk;$(ILINK_LibraryPath)</ILINK_LibraryPath>
+			<ILINK_LibraryPath>libgit2-0.22.2\;..\..\libgit\libgit2-0.22.2\;$(BDS)\lib;$(BDS)\lib\psdk;$(BDS)\lib\obj;$(BDS)\lib\psdk;$(ILINK_LibraryPath)</ILINK_LibraryPath>
 			<FinalOutputDir>Release\</FinalOutputDir>
 			<ILINK_SuppressBanner>true</ILINK_SuppressBanner>
 			<ILINK_WinAppType>DLL</ILINK_WinAppType>
@@ -79,10 +79,6 @@
 			<IntermediateOutputDir>Release_Build</IntermediateOutputDir>
 		</PropertyGroup>
 		<ItemGroup>
-			<LibFiles Include="..\..\libgit\libgit2-0.22.2\LibgitBCB.lib">
-				<IgnorePath>true</IgnorePath>
-				<BuildOrder>5</BuildOrder>
-			</LibFiles>
 			<None Include="contentplug.h">
 				<BuildOrder>5</BuildOrder>
 			</None>
@@ -98,6 +94,10 @@
 				<BuildOrder>-1</BuildOrder>
 				<BuildOrder>1</BuildOrder>
 			</ResFiles>
+			<LibFiles Include="libgit2-0.22.2\LibgitBCB.lib">
+				<IgnorePath>true</IgnorePath>
+				<BuildOrder>5</BuildOrder>
+			</LibFiles>
 			<None Include="uGitForBCB.h">
 				<BuildOrder>4</BuildOrder>
 			</None>

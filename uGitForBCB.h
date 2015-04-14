@@ -114,6 +114,26 @@ typedef enum {
       GIT_STREAM_RW = (GIT_STREAM_RDONLY | GIT_STREAM_WRONLY),
    } git_odb_streammode;
 
+   typedef enum {
+	GIT_STATUS_CURRENT = 0,
+
+	GIT_STATUS_INDEX_NEW        = (1u << 0),
+	GIT_STATUS_INDEX_MODIFIED   = (1u << 1),
+	GIT_STATUS_INDEX_DELETED    = (1u << 2),
+	GIT_STATUS_INDEX_RENAMED    = (1u << 3),
+	GIT_STATUS_INDEX_TYPECHANGE = (1u << 4),
+
+	GIT_STATUS_WT_NEW           = (1u << 7),
+	GIT_STATUS_WT_MODIFIED      = (1u << 8),
+	GIT_STATUS_WT_DELETED       = (1u << 9),
+	GIT_STATUS_WT_TYPECHANGE    = (1u << 10),
+	GIT_STATUS_WT_RENAMED       = (1u << 11),
+	GIT_STATUS_WT_UNREADABLE    = (1u << 12),
+
+	GIT_STATUS_IGNORED          = (1u << 14),
+} git_status_t;
+
+
    #define GIT_IDXENTRY_UPDATE            (1 << 0)
    #define GIT_IDXENTRY_REMOVE            (1 << 1)
    #define GIT_IDXENTRY_UPTODATE          (1 << 2)
@@ -800,5 +820,24 @@ GIT_EXTERN(int) git_commit_lookup(
 	git_commit **commit, git_repository *repo, const git_oid *id);
 GIT_EXTERN(void) git_commit_free(git_commit *commit);
 GIT_EXTERN(const char *) git_commit_summary(git_commit *commit);
+GIT_EXTERN(int) git_remote_list(git_strarray *out, git_repository *repo);
+GIT_EXTERN(int) git_remote_lookup(git_remote **out, git_repository *repo, const char *name);
+
+typedef enum {
+	GIT_REPOSITORY_OPEN_NO_SEARCH = (1 << 0),
+	GIT_REPOSITORY_OPEN_CROSS_FS  = (1 << 1),
+	GIT_REPOSITORY_OPEN_BARE      = (1 << 2),
+} git_repository_open_flag_t;
+
+GIT_EXTERN(int) git_repository_open_ext(
+	git_repository **out,
+	const char *path,
+	unsigned int flags,
+	const char *ceiling_dirs);
+typedef struct {
+	char *message;
+	int klass;
+} git_error;
+GIT_EXTERN(const git_error *) giterr_last(void);
 
 #endif

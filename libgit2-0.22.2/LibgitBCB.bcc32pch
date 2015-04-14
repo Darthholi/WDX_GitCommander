@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<Project>
+  <Options/>
+  <ProjectOptions>
+    <CompilerTools>
+      <DisableReplacementCompiler Value="0"/>
+      <MakeTool Value=""/>
+      <Bcc32 Value=""/>
+      <Ilink32 Value=""/>
+    </CompilerTools>
+    <Linker>
+      <OverwriteLibFiles Value="0"/>
+      <LibFiles Value=""/>
+    </Linker>
+  </ProjectOptions>
+</Project>

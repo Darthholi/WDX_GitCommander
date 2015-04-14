@@ -1,52 +1,52 @@
 // gitcmd.cpp : Defines the entry point for the DLL application.
 //
 //posunu li sloupec doelva a nic do nej nenapisu, zustane info z predchoziho sloupce. TO se muze hodit.
-//size a pripona u adresaru nejsou, takze tam zobrazovat co?
-//branch, origin, datum posl. commitu,
 //nahradit datum datumem posledniho predchoziho commitu
-//posledni commit message..?
 //pluginst.inf
 //plugman protoze neni schvalenej plugin.
 //jmeno a pripona nejdou odstranit ale kdyz budu zobrazovat nazev vetve tak ho muzu zobrazit prez priponu
-//jak je to s datetime ?
-//zobraz neco pro radku s  .. ...?
-//if (_tcslen(FileName)<=3) .. tohle?
-//folder .git - size is also a nice column
+
 //https://github.com/libgit2/GitForDelphi/blob/binary/tests/git2.dll
 //https://github.com/libgit2/GitForDelphi
-//remote :git_remote_list
-//posledni commit ovlivnujici file:GIT_EXTERN(int) git_commit_entry_last_commit_id(git_oid *out,	const git_repository *repo,	const git_commit *commit,	const char *path);
-//komentar posledniho cimmitu?
-// cas posledniho cimmitu?
-//autor posl commitu
-//origin, vetev, tag
-//git stat pro ten soubor
-//git log https://libgit2.github.com/libgit2/ex/HEAD/log.html
 
 //pridat cache poslednich nekolika .git repozitaru a reference na nej.
 //cleaning kdyz se otevre jiny, nebo kdyz se zavre dll.
+//filestatus otestovat nejde protoze potrebuje jmeno toho souboru...
+//format o vou commitech
+//GIT: [=gitcmd.FirstRemoteUrl]\n [=gitcmd.CurrentBranch] ([=gitcmd.CommitAge])\n[=gitcmd.CommitMessage]\n[=gitcmd.CommitDate.D.M.Y] [=gitcmd.CommitAuthor.name] [=gitcmd.CommitAuthor.email]\n File [=gitcmd.FileStatus]\n[=gitcmd.LastAuthor.email]([=gitcmd.LastCommitAge]): [=gitcmd.LastCommitMessage]
 
 //if C++ builder5:
 #define _BCB
-#define _BUILD_DLL_
-//GIT:
-//#include "include/git2.h"
-#include "uGitForBCB.h"
+
+//normal defines:
 #include "StdAfx.h"
-#include "time.h"
 #include "contentplug.h"
 #include <stdio.h>
-#include <sys/stat.h>
+#include <ctype.h>
 #include <string.h>
 #include <iostream.h>
 #include <algorithm>
 
+//spec defines:
+#ifdef _BCB
+#define _BUILD_DLL_
+//GIT:      normally we should do this
+//#include "include/git2.h"
+//but we include GitForBCB, things ripped from libgit2:
+#include "uGitForBCB.h"
+#include "time.h"
+#include <sys/stat.h>
+#endif
+
+//rest of normal code:
 #define _detectstring ""
 
-#define fieldcount 31
+#define fieldcount 37
 
 char* fieldnames[fieldcount]={
-	"name","Size","creationdate","creationtime",
+	"name",
+  "SizeAndBranch",                                                                 //Branch instead of <DIR>
+  "creationdate","creationtime",
 	"writedate","writetime","accessdate","accesstime",
 	"attributes","attrstr",
 	"archive","read only","hidden","system",
@@ -54,7 +54,11 @@ char* fieldnames[fieldcount]={
 	"versionstring","versionnr","file type","random nr",
 	"CutNameStart","DayOfYear","PathLenAnsi","PathLenUnicode",
 	"JPG+RAW present",
-  "LastCommit", "CurrentBranch", "CommitAuthor", "CommitDate", "CommitAge"};
+  "CommitMessage", "CurrentBranch", "CommitAuthor", "CommitDate", "CommitAge",    //functionality for whole repo, commit we are standing at
+  "FirstRemoteUrl",                                                               //functionality for whole repo, commit we are standing at
+  "FileStatus",                                                                   //functionality for specific file
+  "LastCommitMessage", "LastAuthor", "LastDate", "LastCommitAge"                  //Last* .. functionality for specific file
+  };
 
 int fieldtypes[fieldcount]={
 		ft_string,ft_numeric_floating,ft_datetime,ft_time,
@@ -65,7 +69,9 @@ int fieldtypes[fieldcount]={
 		ft_string,ft_numeric_floating,
 		ft_multiplechoice,ft_numeric_32,ft_string,
 		ft_numeric_32,ft_numeric_32,ft_numeric_32,ft_boolean,
-    ft_string, ft_string, ft_string,ft_datetime,ft_string};
+    ft_string, ft_string, ft_string,ft_datetime,ft_string,
+    ft_string, ft_string,
+    ft_string,ft_string,ft_datetime,ft_string};
 
 char* fieldunits_and_multiplechoicestrings[fieldcount]={
 		"","bytes|kbytes|Mbytes|Gbytes","","",
@@ -75,7 +81,9 @@ char* fieldunits_and_multiplechoicestrings[fieldcount]={
 		"","","",
 		"","","file|folder|reparse point","","0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20",
 		"","","","",
-    "","","name|email","",""};
+    "","","name|email","","",
+    "","",
+    "","name|email","",""};
 
 int fieldflags[fieldcount]={
     0,contflags_passthrough_size_float | contflags_edit,contflags_edit,contflags_edit,
@@ -84,7 +92,8 @@ int fieldflags[fieldcount]={
     0,0,0,0,
     0,0,0,
 	0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0};
+  0,0,0,0,0,0,0,
+  0,0,0,0};
 
 int sortorders[fieldcount]={
   1,-1,-1,-1,
@@ -93,7 +102,8 @@ int sortorders[fieldcount]={
   1,1,1,1,
   1,1,1,
   1,1,1,1,1,1,1,1,
-  1,1,1,1,-1};
+  1,1,1,1,1,1,1,
+  1,1,1,1};
 
 
 char* multiplechoicevalues[3]={
@@ -120,6 +130,23 @@ BOOL APIENTRY DllMain( HANDLE hModule,
   return TRUE;
 }
 
+void path_strip_filename(TCHAR *Path) {
+    size_t Len = _tcslen(Path);
+    if (Len==0) {return;};
+    size_t Idx = Len-1;
+    while (TRUE) {
+        TCHAR Chr = Path[Idx];
+        if (Chr==TEXT('\\')||Chr==TEXT('/')) {
+            if (Idx==0||Path[Idx-1]==':') {Idx++;};
+            break;
+        } else if (Chr==TEXT(':')) {
+            Idx++; break;
+        } else {
+            if (Idx==0) {break;} else {Idx--;};
+        };
+    };
+    Path[Idx] = TEXT('\0');
+};
 char* strlcpy(char* p,const char* p2,int maxlen)
 {
     if ((int)strlen(p2)>=maxlen) {
@@ -178,6 +205,51 @@ bool dirExists(const char *path)
     else
         return false;
 }
+//times & howto
+/* print as string:
+  int offset=origoffset;
+
+  char sign, out[32], msg[1024];
+  struct tm *intm;
+  int hours, minutes;
+  time_t t;
+
+  if (offset < 0) {
+    sign = '-';
+    offset = -offset;
+  } else {
+    sign = '+';
+  }
+
+  hours   = offset / 60;
+  minutes = offset % 60;
+
+  t = (time_t)comtim + (origoffset * 60);
+
+  intm = gmtime(&t);
+  strftime(out, sizeof(out), "%a %b %e %T %Y", intm);
+
+  sprintf(msg,"%s%s %c%02d%02d\n", "Date: ", out, sign, hours, minutes);
+  _tcslcpy((TCHAR*)FieldValue,msg,maxlen-1);      */
+void PrintTimeAgo(TCHAR *pTarget,double pAgo,unsigned int pMaxLen)
+{
+  #define NUMFMTSAGE 6
+  int xDifs[NUMFMTSAGE]={1,60,3600,24*3600,2629743,31556926};//seconds,minutes,hours,days,approxmonths,years
+  char *xNam[NUMFMTSAGE]={"secs.","mins","hrs.","days","months","years"};
+  int iDo=0;
+  while (iDo<NUMFMTSAGE)
+  {
+    if (pAgo/double(xDifs[iDo])<1.0)
+      break;
+    iDo++;
+  }
+  if (iDo >= 1)//the prev one
+    iDo--;
+  int xRes=int(0.5+pAgo/xDifs[iDo]);
+  char msg[512];
+  sprintf(msg,"%d %s", xRes, xNam[iDo]);
+  _tcslcpy((TCHAR*)pTarget,msg,pMaxLen-1);
+}
 string number_fmt(__int64 n)
 {
   // cout << "(" << n << ")" << endl;
@@ -212,34 +284,73 @@ enum EPositionType{EPTNothing, //not git;
 EPTGitOK,                       //The viewed directory has .git subfolder (filename is a directory)
 EPTGitDirect,                   //this is the .git folder                 (filename is a directory)
 EPTInside};                     //this folder is some folder inside current repository
-git_repository *CheckRepo(WIN32_FIND_DATA fd, TCHAR* FileName, EPositionType &pRet)
+git_repository *CheckRepo(WIN32_FIND_DATA fd, TCHAR* FileName, EPositionType &pRet, bool pDoSearch, TCHAR *pRelFilePath)
 {
-  if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))  //for files:
+  char xTemp[2048];
+  strcpy(xTemp,FileName);
+  pRet=EPTNothing;
+  if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))  //for files - check the directory we are in
   {
-    pRet=EPTNothing;
-    return NULL;
+    //strcpy(xTemp,FileName);
+    path_strip_filename(xTemp);
   }
-  //...(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)//String to display... now this is the magic
+  int xOriglen=strlen(xTemp);
+
   git_repository *repo = NULL;
-  if (strstr(FileName,"\\.git")==FileName+strlen(FileName)-5) //now we are INSIDE a repo
+  if (strstr(xTemp,"\\.git")==xTemp+xOriglen-5) //now we are INSIDE a repo and this is exactly the information for the invisible git dir
   {
     pRet=EPTGitDirect;
-    if (0==git_repository_open(&repo, FileName))
-      return repo;
+    if (0!=git_repository_open(&repo, xTemp))
+      repo=NULL;
   }
   else
   {
-    char xTemp[2048];
-    strcpy(xTemp,FileName);
     strcat(xTemp,"\\.git");
     if (dirExists(xTemp)) // we are looking at the repo
     {
       pRet=EPTGitOK;
-      if (0==git_repository_open(&repo, FileName))
-        return repo;
+      if (0!=git_repository_open(&repo, xTemp))
+        repo=NULL;
+     }
+     //else let git find it.... ..
+     else if (pDoSearch)
+     {
+        xTemp[xOriglen]=0;
+        if (0!=git_repository_open_ext(&repo, xTemp,0,NULL))
+          repo=NULL;
+        else
+          pRet=EPTInside;
      }
   }
-  return NULL;
+  if (pRelFilePath)             //we want to know the relative path in git repo of this file.
+  {
+    if (repo && !(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+    {
+      const char *xRepdir=git_repository_path(repo);   //returns different than windows slashes!!!
+      int xLastK=0;
+      for (int i=0;i<sizeof(xTemp);i++)
+      {
+        if (((FileName[i]=='\\' && xRepdir[i]=='/') || (FileName[i]=='/' && xRepdir[i]=='\\')))
+          xLastK=i;
+        if (FileName[i]==0 || xRepdir==0 ||
+        ( tolower(FileName[i])!=tolower(xRepdir[i]) &&
+         ((FileName[i]!='\\' || xRepdir[i]!='/') && (FileName[i]!='/' || xRepdir[i]!='\\')) ))
+        {
+          break;
+        }
+      }
+      xLastK=xLastK+1;//just after the "\\" or /
+      //(*pRelFilePath)=FileName+i;
+      strcpy(pRelFilePath,FileName+xLastK);                //alternatively we can modify the original FileName, because xPtrFN points there. But we know it, ok.
+      for (int ii=0;ii<strlen(pRelFilePath);ii++)
+      {
+        if (pRelFilePath[ii]=='\\') pRelFilePath[ii]='/';//for git
+      }
+    }
+    else
+      pRelFilePath[0]=0;
+  }
+  return repo;
 }
 void ByeRepo(git_repository *pBye)
 {
@@ -304,164 +415,195 @@ PLUGFUNC int __stdcall ContentGetValue(TCHAR* FileName,int FieldIndex,int UnitIn
 		case 0:  //	"name"
 			_tcslcpy((TCHAR*)FieldValue,fd.cFileName,maxlen-1);
 			break;
+    //-------------GIT FUNCTIONALITY-----------------------------------------
     case 30: //"CommitAge"
     case 29: //"CommitDatetime"
     case 28: //"CommitAuthor"
-    case 27:  //"CurrentBranch",
-    case 26: //git last commit message
+    case 27: //"CurrentBranch",
+    case 26: //commit message
     {
-      EPositionType xRet;
-      git_repository *repo = CheckRepo(fd,FileName,xRet);
-      bool xGitPrinted=false;
+      EPositionType xRet;                               //false -> let these functions return something ONLY on directories
+      git_repository *repo = CheckRepo(fd,FileName,xRet,true,NULL);
       if (repo)                   //possibility to display different things for different xRet;
       {
-        //get commit and commit message
-        git_commit * commit = NULL; /* the result */
-        git_oid oid_parent_commit;  /* the SHA1 for last commit */
-        /* resolve HEAD into a SHA1 */
-        int rc = git_reference_name_to_id( &oid_parent_commit, repo, "HEAD" );
-        if ( rc == 0 )
+        if (FieldIndex==27) //"CurrentBranch"
         {
-          /* get the actual commit structure */
-          rc = git_commit_lookup( &commit, repo, &oid_parent_commit );
+          int error = 0;
+          const char *branch = NULL;
+          git_reference *head = NULL;
+
+          error = git_repository_head(&head, repo);
+
+          if (error == GIT_EUNBORNBRANCH || error == GIT_ENOTFOUND)
+            branch = NULL;
+          else if (!error) {
+            branch = git_reference_shorthand(head);
+          }
+
+          if (branch)
+            strlcpy(((char*)FieldValue),branch,maxlen-1);
+          else
+            strlcpy(((char*)FieldValue),"[HEAD]",maxlen-1);
+
+          git_reference_free(head);
+        }
+        else          //operations with last commit:
+        {
+          //get commit and commit message
+          git_commit * commit = NULL; /* the result */
+          git_oid oid_parent_commit;  /* the SHA1 for last commit */
+          /* resolve HEAD into a SHA1 */
+          int rc = git_reference_name_to_id( &oid_parent_commit, repo, "HEAD" );
           if ( rc == 0 )
           {
-            //return commit;
-            switch (FieldIndex)
+            /* get the actual commit structure */
+            rc = git_commit_lookup( &commit, repo, &oid_parent_commit );
+            if ( rc == 0 )
             {
-              case 26: //git last commitmessage
+              //return commit;
+              switch (FieldIndex)
               {
-                const git_signature *xSig=git_commit_author(commit);
-                if (xSig)
+                case 26: //git last commitmessage
                 {
-                  switch (UnitIndex)
+                  char *xCMsg=(char*)git_commit_summary(commit);//whole message: git_commit_message
+                  _tcslcpy((TCHAR*)FieldValue,xCMsg,maxlen-1);
+                }
+                break;
+                case 28: //"CommitAuthor"
+                {
+                  const git_signature *xSig=git_commit_author(commit);
+                  if (xSig)
                   {
-                  case 0:        //name
-                    _tcslcpy((TCHAR*)FieldValue,xSig->name,maxlen-1);
-                    break;
-                  case 1:       //email
-                    _tcslcpy((TCHAR*)FieldValue,xSig->email,maxlen-1);
-                    break;
+                    switch (UnitIndex)
+                    {
+                    case 0:        //name
+                      _tcslcpy((TCHAR*)FieldValue,xSig->name,maxlen-1);
+                      break;
+                    case 1:       //email
+                      _tcslcpy((TCHAR*)FieldValue,xSig->email,maxlen-1);
+                      break;
+                    }
                   }
                 }
-              }
-              break;
-            }
-
-
-            git_time_t comtim=git_commit_time(commit);
-            int origoffset=git_commit_time_offset(commit);
-            TimetToFileTime(comtim, ((FILETIME*)FieldValue));
-            /* print as string:
-            int offset=origoffset;
-
-            char sign, out[32], msg[1024];
-            struct tm *intm;
-            int hours, minutes;
-            time_t t;
-
-            if (offset < 0) {
-              sign = '-';
-              offset = -offset;
-            } else {
-              sign = '+';
-            }
-
-            hours   = offset / 60;
-            minutes = offset % 60;
-
-            t = (time_t)comtim + (origoffset * 60);
-
-            intm = gmtime(&t);
-            strftime(out, sizeof(out), "%a %b %e %T %Y", intm);
-
-            sprintf(msg,"%s%s %c%02d%02d\n", "Date: ", out, sign, hours, minutes);
-            _tcslcpy((TCHAR*)FieldValue,msg,maxlen-1);      */
-          }
-        }
-
-        ByeRepo(repo);
-      }
-    }
-    case 28: //"CommitAuthor"
-    {
-      EPositionType xRet;
-      git_repository *repo = CheckRepo(fd,FileName,xRet);
-      bool xGitPrinted=false;
-      if (repo)                   //possibility to display different things for different xRet;
-      {
-        //get commit and commit message
-        git_commit * commit = NULL; /* the result */
-        git_oid oid_parent_commit;  /* the SHA1 for last commit */
-        /* resolve HEAD into a SHA1 */
-        int rc = git_reference_name_to_id( &oid_parent_commit, repo, "HEAD" );
-        if ( rc == 0 )
-        {
-          /* get the actual commit structure */
-          rc = git_commit_lookup( &commit, repo, &oid_parent_commit );
-          if ( rc == 0 )
-          {
-            //return commit;
-            const git_signature *xSig=git_commit_author(commit);
-            if (xSig)
-            {
-              switch (UnitIndex)
-              {
-              case 0:        //name
-                _tcslcpy((TCHAR*)FieldValue,xSig->name,maxlen-1);
                 break;
-              case 1:       //email
-                _tcslcpy((TCHAR*)FieldValue,xSig->email,maxlen-1);
+                case 29: //"CommitDatetime"
+                {
+                  git_time_t comtim=git_commit_time(commit);
+                  int origoffset=git_commit_time_offset(commit);
+                  TimetToFileTime(comtim, ((FILETIME*)FieldValue));
+                }
+                break;
+                case 30: //"CommitAge"
+                {
+                  git_time_t comtim=git_commit_time(commit);
+                  time_t xNow;
+                  time(&xNow);
+                  double xAgo=difftime(xNow, comtim);//difference in seconds
+                  PrintTimeAgo((TCHAR*)FieldValue,xAgo,maxlen);
+                }
                 break;
               }
+
+              git_commit_free(commit);
             }
           }
         }
-
         ByeRepo(repo);
       }
+      else
+        return ft_fieldempty;
     }
     break;
-    case 27:  //"CurrentBranch",
+    case 31: //"FirstRemoteUrl"
     {
       EPositionType xRet;
-      git_repository *repo = CheckRepo(fd,FileName,xRet);
-      bool xGitPrinted=false;
-      if (repo)                   //possibility to display different things for different xRet;
-      {
-        int error = 0;
-        const char *branch = NULL;
-        git_reference *head = NULL;
-
-        error = git_repository_head(&head, repo);
-
-        if (error == GIT_EUNBORNBRANCH || error == GIT_ENOTFOUND)
-          branch = NULL;
-        else if (!error) {
-          branch = git_reference_shorthand(head);
-        }
-
-        if (branch)
-          strlcpy(((char*)FieldValue),branch,maxlen-1);
-        else
-          strlcpy(((char*)FieldValue),"[HEAD]",maxlen-1);
-
-        git_reference_free(head);
-        ByeRepo(repo);
-      }
-    }
-    break;
-    case 26: //git last commit message
-    {
-      EPositionType xRet;
-      git_repository *repo = CheckRepo(fd,FileName,xRet);
+      git_repository *repo = CheckRepo(fd,FileName,xRet,true,NULL);
       if (repo)
       {
+        git_strarray xRs;
+        if (0==git_remote_list(&xRs,repo))
+        {
+          if (xRs.count>=1)
+          {
+            git_remote *remote=NULL;
+            if (0==git_remote_lookup(&remote,repo,xRs.strings[0]))//first repo
+            {
+              _tcslcpy((TCHAR*)FieldValue,git_remote_url(remote),maxlen-1);
+              git_remote_free(remote);
+            }
+            else
+              _tcslcpy((TCHAR*)FieldValue,xRs.strings[0],maxlen-1);  //at least the remote name
+          }
+          else
+            _tcslcpy((TCHAR*)FieldValue,"Local rep.",maxlen-1);  //at least the remote name
+
+          git_strarray_free(&xRs);
+        }
+        ByeRepo(repo);
+      }
+      else return ft_fieldempty;
+    }
+    break;
+    case 32: //"FileStatus"        //possible formatting - index or working tree.
+    {
+      if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)  //only for files
+        return ft_fieldempty;
+
+      EPositionType xRet;
+      char xBufFN[2048];//filename for git
+      git_repository *repo = CheckRepo(fd,FileName,xRet,true,xBufFN);
+      if (repo && xBufFN[0]!=0)
+      {
+        git_strarray xRs;
+        unsigned int xStatF=0;
+        if (0==git_status_file(&xStatF,repo,xBufFN)) //+strlen(git_repository_path(repo))
+        {
+          if (xStatF & GIT_STATUS_IGNORED)
+            _tcslcpy((TCHAR*)FieldValue,"ignored",maxlen-1);
+          else if (xStatF & GIT_STATUS_WT_NEW)
+            _tcslcpy((TCHAR*)FieldValue,"new",maxlen-1);
+          else if (xStatF & GIT_STATUS_WT_MODIFIED)
+            _tcslcpy((TCHAR*)FieldValue,"modified",maxlen-1);
+          else if (xStatF & GIT_STATUS_WT_DELETED)
+            _tcslcpy((TCHAR*)FieldValue,"deleted",maxlen-1);
+          else if (xStatF & GIT_STATUS_WT_TYPECHANGE)
+            _tcslcpy((TCHAR*)FieldValue,"typechange",maxlen-1);
+          else if (xStatF & GIT_STATUS_WT_RENAMED)
+            _tcslcpy((TCHAR*)FieldValue,"renamed",maxlen-1);
+          else if (xStatF & GIT_STATUS_WT_UNREADABLE)
+            _tcslcpy((TCHAR*)FieldValue,"unreadable",maxlen-1);
+        }
+        if (xStatF==0)//nothing printed or error
+        {
+          //_tcslcpy((TCHAR*)FieldValue,xBufFN,maxlen-1);
+          //_tcslcpy((TCHAR*)FieldValue,git_repository_path(repo),maxlen-1);//debug del.
+          const git_error *error = giterr_last();
+          if (error)
+            _tcslcpy((TCHAR*)FieldValue,error->message,maxlen-1);
+          else
+            _tcslcpy((TCHAR*)FieldValue,"unchanged",maxlen-1);
+        }
+        ByeRepo(repo);
+      }
+      else
+        return ft_fieldempty;
+    }
+    break;
+    // ---- based on: https://github.com/libgit2/libgit2sharp/issues/89 --- :
+    // it is said to beslow so use only in TC hints AND NOT IN COLUMNS
+    case 33://  "LastCommitMessage",
+    case 34://"LastAuthor",
+    case 35://"LastDate",
+    case 36://"LastCommitAge"
+    {
+      EPositionType xRet;
+      char xBufFN[2048];
+      git_repository *repo = CheckRepo(fd,FileName,xRet,true,xBufFN);
+      if (repo && xBufFN[0]!=0)                   //possibility to display different things for different xRet;
+      {
         //get commit and commit message
         git_commit * commit = NULL; /* the result */
         git_oid oid_parent_commit;  /* the SHA1 for last commit */
-
-
         /* resolve HEAD into a SHA1 */
         int rc = git_reference_name_to_id( &oid_parent_commit, repo, "HEAD" );
         if ( rc == 0 )
@@ -470,21 +612,83 @@ PLUGFUNC int __stdcall ContentGetValue(TCHAR* FileName,int FieldIndex,int UnitIn
           rc = git_commit_lookup( &commit, repo, &oid_parent_commit );
           if ( rc == 0 )
           {
-            //return commit;
-
-            char *xCMsg=(char*)git_commit_summary(commit);//whole message: git_commit_message
-            _tcslcpy((TCHAR*)FieldValue,xCMsg,maxlen-1);
-
+            //we have the last commit. Now to walk it:
+            git_oid xLastAffecting;
+            git_commit *xFilesCommit = NULL;
+            if (0==git_commit_entry_last_commit_id(&xLastAffecting,repo,commit,xBufFN))
+            {
+              rc = git_commit_lookup( &xFilesCommit, repo, &xLastAffecting );
+              if (rc == 0)
+              {
+                switch (FieldIndex)
+                {
+                  case 33://  "LastCommitMessage",
+                  {
+                    char *xCMsg=(char*)git_commit_summary(xFilesCommit);//whole message: git_commit_message
+                    _tcslcpy((TCHAR*)FieldValue,xCMsg,maxlen-1);
+                  }
+                  break;
+                  case 34://"LastAuthor",
+                  {
+                    const git_signature *xSig=git_commit_author(xFilesCommit);
+                    if (xSig)
+                    {
+                      switch (UnitIndex)
+                      {
+                      case 0:        //name
+                        _tcslcpy((TCHAR*)FieldValue,xSig->name,maxlen-1);
+                        break;
+                      case 1:       //email
+                        _tcslcpy((TCHAR*)FieldValue,xSig->email,maxlen-1);
+                        break;
+                      }
+                    }
+                  }
+                  break;
+                  case 35://"LastDate",
+                  {
+                    git_time_t comtim=git_commit_time(xFilesCommit);
+                    int origoffset=git_commit_time_offset(xFilesCommit);
+                    TimetToFileTime(comtim, ((FILETIME*)FieldValue));
+                  }
+                  break;
+                  case 36://"LastCommitAge"
+                  {
+                    time_t xNow;
+                    double xAgo;
+                    try
+                    {
+                    git_time_t comtim=git_commit_time(xFilesCommit);
+                    //time_t xNow;
+                    time(&xNow);
+                    /*double */xAgo=difftime(xNow, comtim);//difference in seconds
+                    }
+                    catch (...)
+                    {
+                      _tcslcpy((TCHAR*)FieldValue,"chyba tak obecne",maxlen-1);
+                    }
+                    try
+                    {
+                      PrintTimeAgo((TCHAR*)FieldValue,xAgo,maxlen);
+                    }
+                    catch (...)
+                    {
+                      _tcslcpy((TCHAR*)FieldValue,"chyba v printtimeago",maxlen-1);
+                    }
+                  }
+                  break;
+                }
+                git_commit_free(xFilesCommit);
+              }
+            }
             git_commit_free(commit);
           }
-          //else return NULL
         }
-        if (rc!=0) _tcslcpy((TCHAR*)FieldValue,"Cant get commit message.",maxlen-1);
-        //else return NULL;
-        //end get commit and commit message
-
         ByeRepo(repo);
+        if (rc!=0) return ft_fieldempty;
       }
+      else
+        return ft_fieldempty;
     }
     break;
 		case 1:  // "size"  + SPECIAL FOR GIT
@@ -513,7 +717,7 @@ PLUGFUNC int __stdcall ContentGetValue(TCHAR* FileName,int FieldIndex,int UnitIn
         else //  if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)//String to display... now this is the magic
         {
           EPositionType xRet;
-          git_repository *repo = CheckRepo(fd,FileName,xRet);
+          git_repository *repo = CheckRepo(fd,FileName,xRet,false,NULL);//false - will not slow down if needs to find repo
           bool xGitPrinted=false;
           if (repo)                   //possibility to display different things for different xRet;
           {
@@ -543,6 +747,7 @@ PLUGFUNC int __stdcall ContentGetValue(TCHAR* FileName,int FieldIndex,int UnitIn
         }
       }
 			break;
+    //--------END GIT--------------------------------------------------------
 		case 2:  // "creationdate"
 			FileTimeToLocalFileTime(&fd.ftCreationTime,&lt);
 			/*FileTimeToSystemTime(&lt,&st);
