@@ -5,15 +5,13 @@ Git plugin for Total Commander!
 Dear guys! This project is aimed to try to compile libgit2 using C++Builder XE and making a plugin for total commander.
 It should work without git backend and without the git tools in the path (thats why i compiled libgit anyway). 
 
-To use the plugin - download Release.zip and set it up in total commander.
-Yes it might not be officially noticed by TCmd yet (and it will show an ugly message possibly about missing dll which I dont understand yet) and thats why there is the plugin manager
-http://totalcmd.net/plugring/tc_plugman.html
-use this manager to install gitcmd.
+To use the plugin - download Release.zip and set it up in Total Commander.
+(It should be sufficient just to open the zip in TC, for everything else there is http://totalcmd.net/plugring/tc_plugman.html)
 
 The easiest way to use is to create your own columns, I suggest just replacing the original SIZE solumn with the column "SizeAndBranch".
-Because that will show the branch instead of <DIR> for directories.
+Because that will show the branch instead of <DIR> for directories (what I personally wanted while creating the plugin).
 
-For like-github functionality in total commander, there is the possibility to create plugin defined hints in total commander.
+For like-github functionality in total commander, there is the possibility to create plugin-defined hints in total commander.
 Just go to Configuration->Display and down there on the setting page tick some boxes with "hint texts" to make visible the small button with "+".
 Then it just remains to add a rule for all files "*" with this formatting:
 
