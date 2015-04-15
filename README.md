@@ -6,7 +6,9 @@ Dear guys! This project is aimed to try to compile libgit2 using C++Builder XE a
 It should work without git backend and without the git tools in the path (thats why i compiled libgit anyway). 
 
 To use the plugin - download Release.zip and set it up in total commander.
-Yes it might not be officially noticed by TCmd yet (and it will show an ugly message possibly about missing dll which I dont understand yet) and thats why there is the plugin manager in the file also (thx guys!), use it to install it.
+Yes it might not be officially noticed by TCmd yet (and it will show an ugly message possibly about missing dll which I dont understand yet) and thats why there is the plugin manager
+http://totalcmd.net/plugring/tc_plugman.html
+use this manager to install gitcmd.
 
 The easiest way to use is to create your own columns, I suggest just replacing the original SIZE solumn with the column "SizeAndBranch".
 Because that will show the branch instead of <DIR> for directories.
