@@ -1,7 +1,9 @@
 # WDX_GitCommander
-Git plugin for toal commander.
+Git plugin for Total Commander!
+(WDX, that means column information and mouseover hints over a repository or a file in repository)
 
 Dear guys! This project is aimed to try to compile libgit2 using C++Builder XE and making a plugin for total commander.
+It should work without git backend and without the git tools in the path (thats why i compiled libgit anyway). 
 
 To use the plugin - download Release.zip and set it up in total commander.
 Yes it might not be officially noticed by TCmd yet (and it will show an ugly message possibly about missing dll which I dont understand yet) and thats why there is the plugin manager in the file also (thx guys!), use it to install it.
