@@ -6,5 +6,5 @@ EXPORTS
 	ContentStopGetValue
 	ContentGetSupportedFieldFlags
 	ContentGetDefaultSortOrder
-	ContentSetValue
-	ContentCompareFiles
+	;ContentSetValue
+	;ContentCompareFiles
