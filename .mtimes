@@ -4,12 +4,13 @@
 1428998272|ProjectGroup1.groupproj
 1428998272|ProjectGroup1.groupproj.local
 1429088691|README.md
-1429792841|Release.zip
+2663044|Release.zip
 1429790984|cmdtest/cmdtest.cpp
 1428996318|cmdtest/projtest.cbproj
-1428996320|cmdtest/projtest.cbproj.local
+1429790818|cmdtest/projtest.cbproj.local
 1429045258|gitcmd.cbproj
-1429792768|gitcmd.cpp
+1429803996|gitcmd.cpp
+1429803996|gitsmd.RES
 1427181044|libgit2-0.22.2/.HEADER
 1427181044|libgit2-0.22.2/.editorconfig
 1427181044|libgit2-0.22.2/.mailmap
@@ -24,7 +25,7 @@
 1428694834|libgit2-0.22.2/LibgitBCB.bpf
 1428695328|libgit2-0.22.2/LibgitBCB.bpr
 1429005843|libgit2-0.22.2/LibgitBCB.cbproj
-1429005844|libgit2-0.22.2/LibgitBCB.cbproj.local
+1429790818|libgit2-0.22.2/LibgitBCB.cbproj.local
 1429005861|libgit2-0.22.2/LibgitBCB.lib
 1427181044|libgit2-0.22.2/Makefile.embed
 1427181044|libgit2-0.22.2/PROJECTS.md

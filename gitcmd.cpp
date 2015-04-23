@@ -48,7 +48,7 @@
 //rest of normal code:
 #define _detectstring ""
 
-#define fieldcount 21
+#define fieldcount 22
 
 //general info groups:
 enum EGitWantSrc{ENone,EThisCommit,ELastAffecting,ELastFallthrough};//the checkout-commit where we stand, the last commit affected file OR empty, the last commit affected file OR currentcheckout
@@ -57,7 +57,8 @@ EBranch,EFirstRemoteURL,   //no specifiers, just general info
 EFileStatus,//Status for file, empty for dirc
 EGeneralStatus,
 ESizeBranch,
-EFallIsThis
+EFallIsThis,
+EDescription
 };
 
 //specific fields: cant be done by formatting because of datetime
@@ -69,7 +70,8 @@ EFFallMsg,EFFallAuthor,EFFallMail,EFFallDate,EFFallAge,   //last commit affectin
 EFBranch,EFFirstRemoteURL,   //no specifiers, just general info
 EFFileStatus,//Status for file, empty for dirc
 EFGeneralStatus, //File+Status for files, "GIT dir." for dirs.
-EFFallIsThis
+EFFallIsThis,
+EFDescription
 };
 char* fieldnames[fieldcount]={
   "SizeAndBranch",                                                                 //Branch instead of <DIR>
@@ -78,7 +80,8 @@ char* fieldnames[fieldcount]={
   "FallMessage","FallAuthor","FallMail","FallDate", "FallAge",
   "Branch","FirstRemoteUrl",                                                               //functionality for whole repo, commit we are standing at
   "FileStatus","GeneralStatus",
-  "FallIsLast"
+  "FallIsLast",
+  "FullDescription"
   };
 int fieldtypes[fieldcount]={
 		ft_numeric_floating,
@@ -86,6 +89,7 @@ int fieldtypes[fieldcount]={
     ft_string,ft_string,ft_string,ft_datetime,ft_string,
     ft_string,ft_string,ft_string,ft_datetime,ft_string,
     ft_string,ft_string,
+    ft_string,
     ft_string,
     ft_string,
     ft_string
@@ -98,15 +102,17 @@ char* fieldunits_and_multiplechoicestrings[fieldcount]={
 		"","",
 		"",
 		"",
+    "",
     ""};
 
 int fieldflags[fieldcount]={
-    contflags_passthrough_size_float | contflags_edit,
+    contflags_passthrough_size_float,
     0,0,0,0,0,
     0,0,0,0,0,
     0,0,0,0,0,
     0,0,
     0,0,
+    0,
     0
     };
 
@@ -176,6 +182,19 @@ TCHAR* _tcslcpy(TCHAR* p,const TCHAR* p2,int maxlen)
         _tcscpy(p,p2);
     return p;
 }
+TCHAR* _etcslcpy(TCHAR* p,const TCHAR* p2,int maxlen)
+{
+  int xL=(int)_tcslen(p2);
+  if (xL>=maxlen)
+  {
+    xL=maxlen;
+    _tcsncpy(p,p2,maxlen);
+    p[maxlen]=0;
+  }
+  else
+    _tcscpy(p,p2);
+  return (TCHAR*)(p+xL);
+}
 
 PLUGFUNC int __stdcall ContentGetDetectString(char* DetectString,int maxlen)
 {
@@ -215,8 +234,34 @@ bool dirExists(const char *path)
     else
         return false;
 }
-//times & howto
-/* print as string:
+//times & howto       .. at windows...
+/* print as string:   */
+struct tm FILETIME_to_tm(const FILETIME *lpFileTime)
+{
+  SYSTEMTIME st;
+
+  struct tm result;
+
+  FileTimeToSystemTime(lpFileTime,&st);
+  memset(&result,0,sizeof(struct tm));
+
+  result.tm_mday = st.wDay;
+  result.tm_mon  = st.wMonth - 1;
+  result.tm_year = st.wYear - 1900;
+
+  result.tm_sec  = st.wSecond;
+  result.tm_min  = st.wMinute;
+  result.tm_hour = st.wHour;
+
+  return result;
+}
+TCHAR *ePrintTime(TCHAR *pTrgt,FILETIME *pIn, int pMaxLen)
+{
+  struct tm xTm=FILETIME_to_tm(pIn);
+  return pTrgt+strftime(pTrgt, pMaxLen, "%d.%m.%Y %H:%I", &xTm);
+}
+/*TCHAR* PrintTime(TCHAR *pTarget,double pAgo,unsigned int pMaxLen)
+{
   int offset=origoffset;
 
   char sign, out[32], msg[1024];
@@ -240,8 +285,9 @@ bool dirExists(const char *path)
   strftime(out, sizeof(out), "%a %b %e %T %Y", intm);
 
   sprintf(msg,"%s%s %c%02d%02d\n", "Date: ", out, sign, hours, minutes);
-  _tcslcpy((TCHAR*)FieldValue,msg,maxlen-1);      */
-void PrintTimeAgo(TCHAR *pTarget,double pAgo,unsigned int pMaxLen)
+  return _etcslcpy((TCHAR*)FieldValue,msg,maxlen-1);
+}   */
+TCHAR* PrintTimeAgo(TCHAR *pTarget,double pAgo,unsigned int pMaxLen)
 {
   #define NUMFMTSAGE 6
   int xDifs[NUMFMTSAGE]={1,60,3600,24*3600,2629743,31556926};//seconds,minutes,hours,days,approxmonths,years
@@ -258,7 +304,7 @@ void PrintTimeAgo(TCHAR *pTarget,double pAgo,unsigned int pMaxLen)
   int xRes=int(0.5+pAgo/xDifs[iDo]);
   char msg[512];
   sprintf(msg,"%d %s", xRes, xNam[iDo]);
-  _tcslcpy((TCHAR*)pTarget,msg,pMaxLen-1);
+  return _etcslcpy((TCHAR*)pTarget,msg,pMaxLen-1);
 }
 string number_fmt(__int64 n)
 {
@@ -452,10 +498,13 @@ PLUGFUNC int __stdcall ContentGetValue(TCHAR* FileName,int FieldIndex,int UnitIn
       xWant=EMsg+(FieldIndex-EFFallMsg);
       xWantFrom=ELastFallthrough;
     break;
+    case EFDescription:
+      xWant=EDescription;
+    break;
   }
 
   bool xNeedfd=true; //everybody needs the information if file or directory
-  bool xStdGit= FieldIndex!=EFSizeBranch;//only size is treated differently
+  bool xStdGit= FieldIndex!=EFSizeBranch && xWant!=EDescription;//only size and allinfo is treated differently
   bool xNeedRepo=true; //everybody (in case xStdGit) needs repo
   bool xNeedCommit = xWantFrom!=ENone;
   bool xNeedLastAffCommit= (xWantFrom==ELastFallthrough || xWantFrom==ELastAffecting);
@@ -499,24 +548,16 @@ PLUGFUNC int __stdcall ContentGetValue(TCHAR* FileName,int FieldIndex,int UnitIn
           {
             /* get the actual commit structure */
             rc = git_commit_lookup( &commit, repo, &oid_parent_commit );
-            //if (!commit) rc=666;
             if ( rc == 0 && xNeedLastAffCommit)
             {
             //we have the last commit. Now to walk it:
               if ((xBufFN && xBufFN[0]!=0) && 0==git_commit_entry_last_commit_id(&xLastAffecting,repo,commit,xBufFN))
               {
                 rc = git_commit_lookup( &xFilesCommit, repo, &xLastAffecting );
-                //if (!xFilesCommit) rc=666;
-                //if (rc == 0)
-                //{
-                //  //we can do work.
-                //}
               }
-              //if (!xLastAffecting) rc=666;
             }
           }
         }
-
         if (rc!=0)//error in getting what we wanted
         {
           xDidError=true;
@@ -716,7 +757,7 @@ PLUGFUNC int __stdcall ContentGetValue(TCHAR* FileName,int FieldIndex,int UnitIn
       else                         //else neni repo nevracime nic.
         return ft_fieldempty;
     }
-    else//operace mimo GIT.
+    else//operations out of git or special:
     {
       switch (FieldIndex)
       {
@@ -735,8 +776,8 @@ PLUGFUNC int __stdcall ContentGetValue(TCHAR* FileName,int FieldIndex,int UnitIn
             filesize/=(1024*1024*1024);
             break;
           }
-          //*(__int64*)FieldValue=filesize;
-          *(double*)FieldValue=filesize;
+          *(__int64*)FieldValue=filesize;
+          //*(double*)FieldValue=filesize;
           // alternate string
           if (maxlen>12)
           {
@@ -776,6 +817,190 @@ PLUGFUNC int __stdcall ContentGetValue(TCHAR* FileName,int FieldIndex,int UnitIn
                 strlcpy(((char*)FieldValue)+8,"<DIR>",maxlen-8-1);
             }
           }
+        }
+        break;
+        case EFDescription: //for hints in TC ...generally
+        {                   //for future when allowed more than 2 lines per one call to getvalue
+          EPositionType xRet;
+          int rc=0;
+          git_commit * commit = NULL; /* the result */
+          git_oid oid_parent_commit;  /* the SHA1 for last commit */
+          git_oid xLastAffecting;
+          git_commit *xFilesCommit = NULL;//the result commit last affecting given file
+          const char *branch = NULL;
+          bool xReturnEmpty=false;
+          bool xDirectory=fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
+          char xBufFN[2048];//filename for git
+          TCHAR *xOrigVal=(TCHAR*)FieldValue;
+
+          git_repository *repo=CheckRepo(fd,FileName,xRet,true,xBufFN);
+          bool xGitPrinted=false;
+          if (repo)                   //possibility to display different things for different xRet;
+          {
+            const char *branch = NULL;
+            git_reference *head = NULL;
+
+            //branch:
+            rc = git_repository_head(&head, repo);
+            if (rc == GIT_EUNBORNBRANCH || rc == GIT_ENOTFOUND)
+              branch = NULL;
+            else if (!rc) {
+              branch = git_reference_shorthand(head);
+            }
+            if (branch)
+              FieldValue=_etcslcpy((TCHAR*)FieldValue,branch,maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+            else
+              FieldValue=_etcslcpy((TCHAR*)FieldValue,"[HEAD]",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+
+            FieldValue=_etcslcpy((TCHAR*)FieldValue,", ",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+
+            //first remote URL:
+            git_strarray xRs;
+            if (0==git_remote_list(&xRs,repo))
+            {
+              if (xRs.count>=1)
+              {
+                git_remote *remote=NULL;
+                if (0==git_remote_lookup(&remote,repo,xRs.strings[0]))//first repo
+                {
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,git_remote_url(remote),maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+                  git_remote_free(remote);
+                }
+                else
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,xRs.strings[0],maxlen-1-(xOrigVal-(TCHAR*)FieldValue));//at least the remote name
+              }
+              else
+                FieldValue=_etcslcpy((TCHAR*)FieldValue,"Local",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));  //at least the remote name
+
+              git_strarray_free(&xRs);
+
+              FieldValue=_etcslcpy((TCHAR*)FieldValue,"\n",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+            }
+
+            //about commits:
+
+            rc = git_reference_name_to_id( &oid_parent_commit, repo, "HEAD" );
+            if ( rc == 0 )
+            {
+              /* get the actual commit structure */
+              rc = git_commit_lookup( &commit, repo, &oid_parent_commit );
+              if ( rc == 0)
+              {
+              //we have the last commit. Now to walk it:
+                if ((xBufFN && xBufFN[0]!=0) && 0==git_commit_entry_last_commit_id(&xLastAffecting,repo,commit,xBufFN))
+                {
+                  rc = git_commit_lookup( &xFilesCommit, repo, &xLastAffecting );
+                }
+              }
+            }
+
+            if (rc!=0)//error in getting what we wanted
+            {
+              if (fieldtypes[FieldIndex]==ft_string)//should be
+              {
+                const git_error *error = giterr_last();
+                if (error)
+                {
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,error->message,maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,"\n",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+                }
+              }
+            }
+            else //can print more about commits
+            {
+              git_commit *xPtrUse;
+              if (xWantFrom==EThisCommit || (xWantFrom==ELastFallthrough && xFilesCommit==NULL))
+                xPtrUse=commit;
+              else
+                xPtrUse=xFilesCommit;
+
+              if ( xPtrUse )
+              {
+                git_time_t comtim=git_commit_time(xPtrUse);
+
+                if (xPtrUse==commit)
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,"This ",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+                else
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,"Last ",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+
+                time_t xNow;
+                time(&xNow);
+                double xAgo=difftime(xNow, comtim);//difference in seconds
+                FieldValue=PrintTimeAgo((TCHAR*)FieldValue,xAgo,maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+
+                FieldValue=_etcslcpy((TCHAR*)FieldValue,"\n",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+
+                //git last commitmessage
+                char *xCMsg=(char*)git_commit_summary(xPtrUse);//whole message: git_commit_message
+                FieldValue=_etcslcpy((TCHAR*)FieldValue,xCMsg,maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+
+                FieldValue=_etcslcpy((TCHAR*)FieldValue,"\n",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+
+                //CommitDatetime
+                //int origoffset=git_commit_time_offset(xPtrUse); todo...
+                FILETIME fT;
+                TimetToFileTime(comtim, &fT);
+                FieldValue=ePrintTime((TCHAR*)FieldValue,&fT,maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+
+                //author
+                const git_signature *xSig=git_commit_author(xPtrUse);
+                if (xSig)
+                {
+                  //name
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,xSig->name,maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue," ",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+                  //email
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,xSig->email,maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+                }
+                FieldValue=_etcslcpy((TCHAR*)FieldValue,"\n",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+              }//else if not null
+
+            } //end commit info
+
+            //about file and such:
+            TCHAR *xTrgt;
+            if (!xDirectory)
+            {
+              unsigned int xStatF=0;
+              if ((xBufFN && xBufFN[0]!=0) && 0==git_status_file(&xStatF,repo,xBufFN))
+              {
+                if (xStatF & GIT_STATUS_IGNORED)
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,"ignored",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+                else if (xStatF & GIT_STATUS_WT_NEW)
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,"new",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+                else if (xStatF & GIT_STATUS_WT_MODIFIED)
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,"modified",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+                else if (xStatF & GIT_STATUS_WT_DELETED)
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,"deleted",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+                else if (xStatF & GIT_STATUS_WT_TYPECHANGE)
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,"typechange",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+                else if (xStatF & GIT_STATUS_WT_RENAMED)
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,"renamed",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+                else if (xStatF & GIT_STATUS_WT_UNREADABLE)
+                  FieldValue=_etcslcpy((TCHAR*)FieldValue,"unreadable",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+              }
+              if (xStatF==0)//nothing printed or error
+              {
+                /*const git_error *error = giterr_last();
+                if (error)
+                  _tcslcpy(xTrgt,error->message,maxlen-1);
+                else*/
+                FieldValue=_etcslcpy((TCHAR*)FieldValue,"unchanged",maxlen-1-(xOrigVal-(TCHAR*)FieldValue));
+              }
+            }
+
+            //[=gitcmd.Branch] [=gitcmd.FirstRemoteUrl]\n[=gitcmd.FallIsLast] [=gitcmd.FallAge]\n[=gitcmd.FallMessage]\n[=gitcmd.FallAuthor] [=gitcmd.FallMail] [=gitcmd.FallDate.D.M.Y h:m:s]\n[=gitcmd.GeneralStatus]
+            if (xFilesCommit)
+              git_commit_free(xFilesCommit);
+            if (commit)
+              git_commit_free(commit);
+            git_reference_free(head);
+            ByeRepo(repo);
+            xGitPrinted=true;
+          }
+          if (!xGitPrinted)
+            return ft_fieldempty;
+
         }
         break;
         default:
@@ -900,8 +1125,8 @@ PLUGFUNC void __stdcall ContentStopGetValue	(TCHAR* FileName)
 
 PLUGFUNC int __stdcall ContentGetSupportedFieldFlags(int FieldIndex)
 {
-	if (FieldIndex==-1)
-		return contflags_edit | contflags_substmask;
+	if (FieldIndex==-1)                          //must return ALL the flags ORED together
+		return contflags_passthrough_size_float; //contflags_edit | contflags_substmask;
 	else if (FieldIndex<0 || FieldIndex>=fieldcount)
 		return 0;
 	else

@@ -1,13 +1,13 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <BorlandProject>
 	<Transactions>
-    <Transaction>1899.12.30 00:00:00.000.397,=C:\Users\Martin\Documents\RAD Studio\Projects\Unit1.cpp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.889,=C:\Users\Martin\Documents\RAD Studio\Projects\File1.cpp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.189,=C:\Users\Martin\Documents\RAD Studio\Projects\Unit1.cpp</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.833,C:\Users\Martin\Documents\RAD Studio\Projects\Project1.cbproj=D:\Data\Projects\TotalCmdPlugs\wdx_gitcmd\cmdtest\projtest.cbproj</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.506,C:\Users\Martin\Documents\RAD Studio\Projects\File1.cpp=D:\Data\Projects\TotalCmdPlugs\wdx_gitcmd\cmdtest\cmdtest.cpp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.341,=C:\Users\Martin\Documents\RAD Studio\Projects\Project1.res</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.314,=D:\Data\Projects\TotalCmdPlugs\wdx_gitcmd\libgit2-0.22.2\LibgitBCB.lib</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.397,=C:\Users\Martin\Documents\RAD Studio\Projects\Unit1.cpp</Transaction>
     <Transaction>1899.12.30 00:00:00.000.161,=C:\Users\Martin\Documents\RAD Studio\Projects\Project1.res</Transaction>
-    <Transaction>2015.04.14 09:21:38.889,=C:\Users\Martin\Documents\RAD Studio\Projects\File1.cpp</Transaction>
-    <Transaction>2015.04.14 09:22:30.506,D:\Data\Projects\TotalCmdPlugs\wdx_gitcmd\cmdtest\cmdtest.cpp=C:\Users\Martin\Documents\RAD Studio\Projects\File1.cpp</Transaction>
-    <Transaction>2015.04.14 09:22:33.833,D:\Data\Projects\TotalCmdPlugs\wdx_gitcmd\cmdtest\projtest.cbproj=C:\Users\Martin\Documents\RAD Studio\Projects\Project1.cbproj</Transaction>
-    <Transaction>2015.04.14 09:24:15.314,=D:\Data\Projects\TotalCmdPlugs\wdx_gitcmd\libgit2-0.22.2\LibgitBCB.lib</Transaction>
   </Transactions>
 </BorlandProject>
