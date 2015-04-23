@@ -491,7 +491,7 @@ PLUGFUNC int __stdcall ContentGetValue(TCHAR* FileName,int FieldIndex,int UnitIn
       {                                            //if (xBufFN[0]!=0)
         //get commit and commit message
         /* resolve HEAD into a SHA1 */
-
+        bool xDidError=false;
         if (xNeedCommit || xNeedLastAffCommit)
         {
           rc = git_reference_name_to_id( &oid_parent_commit, repo, "HEAD" );
@@ -499,195 +499,209 @@ PLUGFUNC int __stdcall ContentGetValue(TCHAR* FileName,int FieldIndex,int UnitIn
           {
             /* get the actual commit structure */
             rc = git_commit_lookup( &commit, repo, &oid_parent_commit );
+            //if (!commit) rc=666;
             if ( rc == 0 && xNeedLastAffCommit)
             {
             //we have the last commit. Now to walk it:
               if ((xBufFN && xBufFN[0]!=0) && 0==git_commit_entry_last_commit_id(&xLastAffecting,repo,commit,xBufFN))
               {
                 rc = git_commit_lookup( &xFilesCommit, repo, &xLastAffecting );
+                //if (!xFilesCommit) rc=666;
                 //if (rc == 0)
                 //{
                 //  //we can do work.
                 //}
               }
+              //if (!xLastAffecting) rc=666;
             }
           }
         }
+
         if (rc!=0)//error in getting what we wanted
         {
+          xDidError=true;
           if (fieldtypes[FieldIndex]==ft_string)
           {
             const git_error *error = giterr_last();
             if (error)
               _tcslcpy((TCHAR*)FieldValue,error->message,maxlen-1);
             else
-              return ft_fieldempty;
+              xReturnEmpty=true;
           }
           else
-            return ft_fieldempty;
+            xReturnEmpty=true;
         }
 
         //special first and then commit infos.
-        if (xWant==EBranch) //"CurrentBranch"
+        if (!xDidError)//pre error
         {
-          int error = 0;
-          const char *branch = NULL;
-          git_reference *head = NULL;
-
-          error = git_repository_head(&head, repo);
-
-          if (error == GIT_EUNBORNBRANCH || error == GIT_ENOTFOUND)
-            branch = NULL;
-          else if (!error) {
-            branch = git_reference_shorthand(head);
-          }
-
-          if (branch)
-            strlcpy(((char*)FieldValue),branch,maxlen-1);
-          else
-            strlcpy(((char*)FieldValue),"[HEAD]",maxlen-1);
-
-          git_reference_free(head);
-        }
-        else if (xWant==EFirstRemoteURL)
-        {
-          git_strarray xRs;
-          if (0==git_remote_list(&xRs,repo))
+          if (xWant==EBranch) //"CurrentBranch"
           {
-            if (xRs.count>=1)
-            {
-              git_remote *remote=NULL;
-              if (0==git_remote_lookup(&remote,repo,xRs.strings[0]))//first repo
-              {
-                _tcslcpy((TCHAR*)FieldValue,git_remote_url(remote),maxlen-1);
-                git_remote_free(remote);
-              }
-              else
-                _tcslcpy((TCHAR*)FieldValue,xRs.strings[0],maxlen-1);  //at least the remote name
+            int error = 0;
+            const char *branch = NULL;
+            git_reference *head = NULL;
+
+            error = git_repository_head(&head, repo);
+
+            if (error == GIT_EUNBORNBRANCH || error == GIT_ENOTFOUND)
+              branch = NULL;
+            else if (!error) {
+              branch = git_reference_shorthand(head);
             }
+
+            if (branch)
+              strlcpy(((char*)FieldValue),branch,maxlen-1);
             else
-              _tcslcpy((TCHAR*)FieldValue,"Local rep.",maxlen-1);  //at least the remote name
+              strlcpy(((char*)FieldValue),"[HEAD]",maxlen-1);
 
-            git_strarray_free(&xRs);
+            git_reference_free(head);
           }
-          else
-            return ft_fieldempty;
-        }
-        else if (xWant==EFileStatus || xWant==EGeneralStatus)
-        {
-          TCHAR *xTrgt;
-          if (xWant==EGeneralStatus && xDirectory)
+          else if (xWant==EFirstRemoteURL)
           {
-            _tcslcpy((TCHAR*)FieldValue,"File ",maxlen-1);
-            xTrgt=(TCHAR*)FieldValue + strlen((TCHAR*)FieldValue);
-          }
-          else xTrgt=(TCHAR*)FieldValue;
-          if ((!xDirectory && xWant==EGeneralStatus) || xWant==EFileStatus)
-          {
-            unsigned int xStatF=0;
-            if ((xBufFN && xBufFN[0]!=0) && 0==git_status_file(&xStatF,repo,xBufFN))
+            git_strarray xRs;
+            if (0==git_remote_list(&xRs,repo))
             {
-              if (xStatF & GIT_STATUS_IGNORED)
-                _tcslcpy(xTrgt,"ignored",maxlen-1);
-              else if (xStatF & GIT_STATUS_WT_NEW)
-                _tcslcpy(xTrgt,"new",maxlen-1);
-              else if (xStatF & GIT_STATUS_WT_MODIFIED)
-                _tcslcpy(xTrgt,"modified",maxlen-1);
-              else if (xStatF & GIT_STATUS_WT_DELETED)
-                _tcslcpy(xTrgt,"deleted",maxlen-1);
-              else if (xStatF & GIT_STATUS_WT_TYPECHANGE)
-                _tcslcpy(xTrgt,"typechange",maxlen-1);
-              else if (xStatF & GIT_STATUS_WT_RENAMED)
-                _tcslcpy(xTrgt,"renamed",maxlen-1);
-              else if (xStatF & GIT_STATUS_WT_UNREADABLE)
-                _tcslcpy(xTrgt,"unreadable",maxlen-1);
-            }
-            if (xStatF==0)//nothing printed or error
-            {
-              //_tcslcpy((TCHAR*)FieldValue,xBufFN,maxlen-1);
-              //_tcslcpy((TCHAR*)FieldValue,git_repository_path(repo),maxlen-1);//debug del.
-              const git_error *error = giterr_last();
-              if (error)
-                _tcslcpy(xTrgt,error->message,maxlen-1);
-              else
-                _tcslcpy(xTrgt,"unchanged",maxlen-1);
-            }
-          }
-          else if (xDirectory && xWant==EGeneralStatus)
-          {
-            _tcslcpy((TCHAR*)FieldValue,"GIT dir",maxlen-1);
-          }
-        }
-        else //info o commitu
-        {
-          //EMsg,EAuthor,EMail,EDate,EAge
-          //EThisCommit,ELastAffecting,ELastFallthrough
-
-          if (xWantFrom==ELastAffecting && xFilesCommit==NULL)
-          {
-            xReturnEmpty=true;
-          }
-          else
-          {
-            git_commit * xPtrUse;
-            if (xWantFrom==EThisCommit || (xWantFrom==ELastFallthrough && xFilesCommit==NULL))
-              xPtrUse=commit;
-            else
-              xPtrUse=xFilesCommit;
-
-            switch (xWant)
-            {              //EMsg,EAuthor,EMail,EDate,EAge
-              case EFallIsThis:
+              if (xRs.count>=1)
               {
-                if (xPtrUse==commit)
-                  _tcslcpy((TCHAR*)FieldValue,"This commit",maxlen-1);
-                else
-                  _tcslcpy((TCHAR*)FieldValue,"Last affecting",maxlen-1);
-              }
-              break;
-              case EMsg: //git last commitmessage
-              {
-                char *xCMsg=(char*)git_commit_summary(xPtrUse);//whole message: git_commit_message
-                _tcslcpy((TCHAR*)FieldValue,xCMsg,maxlen-1);
-              }
-              break;
-              case EAuthor: //"CommitAuthor"
-              case EMail:
-              {
-                const git_signature *xSig=git_commit_author(xPtrUse);
-                if (xSig)
+                git_remote *remote=NULL;
+                if (0==git_remote_lookup(&remote,repo,xRs.strings[0]))//first repo
                 {
-                  switch (xWant)
-                  {
-                    case EAuthor:        //name
-                      _tcslcpy((TCHAR*)FieldValue,xSig->name,maxlen-1);
-                    break;
-                    case EMail:       //email
-                      _tcslcpy((TCHAR*)FieldValue,xSig->email,maxlen-1);
-                    break;
-                  }
+                  _tcslcpy((TCHAR*)FieldValue,git_remote_url(remote),maxlen-1);
+                  git_remote_free(remote);
                 }
+                else
+                  _tcslcpy((TCHAR*)FieldValue,xRs.strings[0],maxlen-1);  //at least the remote name
               }
-              break;
-              case EDate: //"CommitDatetime"
+              else
+                _tcslcpy((TCHAR*)FieldValue,"Local rep.",maxlen-1);  //at least the remote name
+
+              git_strarray_free(&xRs);
+            }
+            else
+              xReturnEmpty=true;
+          }
+          else if (xWant==EFileStatus || xWant==EGeneralStatus)
+          {
+            TCHAR *xTrgt;
+            if (xWant==EGeneralStatus && xDirectory)
+            {
+              _tcslcpy((TCHAR*)FieldValue,"File ",maxlen-1);
+              xTrgt=(TCHAR*)FieldValue + strlen((TCHAR*)FieldValue);
+            }
+            else xTrgt=(TCHAR*)FieldValue;
+            if ((!xDirectory && xWant==EGeneralStatus) || xWant==EFileStatus)
+            {
+              unsigned int xStatF=0;
+              if ((xBufFN && xBufFN[0]!=0) && 0==git_status_file(&xStatF,repo,xBufFN))
               {
-                git_time_t comtim=git_commit_time(xPtrUse);
-                int origoffset=git_commit_time_offset(xPtrUse);
-                TimetToFileTime(comtim, ((FILETIME*)FieldValue));
+                if (xStatF & GIT_STATUS_IGNORED)
+                  _tcslcpy(xTrgt,"ignored",maxlen-1);
+                else if (xStatF & GIT_STATUS_WT_NEW)
+                  _tcslcpy(xTrgt,"new",maxlen-1);
+                else if (xStatF & GIT_STATUS_WT_MODIFIED)
+                  _tcslcpy(xTrgt,"modified",maxlen-1);
+                else if (xStatF & GIT_STATUS_WT_DELETED)
+                  _tcslcpy(xTrgt,"deleted",maxlen-1);
+                else if (xStatF & GIT_STATUS_WT_TYPECHANGE)
+                  _tcslcpy(xTrgt,"typechange",maxlen-1);
+                else if (xStatF & GIT_STATUS_WT_RENAMED)
+                  _tcslcpy(xTrgt,"renamed",maxlen-1);
+                else if (xStatF & GIT_STATUS_WT_UNREADABLE)
+                  _tcslcpy(xTrgt,"unreadable",maxlen-1);
               }
-              break;
-              case EAge: //"CommitAge"
+              if (xStatF==0)//nothing printed or error
               {
-                git_time_t comtim=git_commit_time(xPtrUse);
-                time_t xNow;
-                time(&xNow);
-                double xAgo=difftime(xNow, comtim);//difference in seconds
-                PrintTimeAgo((TCHAR*)FieldValue,xAgo,maxlen);
+                //_tcslcpy((TCHAR*)FieldValue,xBufFN,maxlen-1);
+                //_tcslcpy((TCHAR*)FieldValue,git_repository_path(repo),maxlen-1);//debug del.
+                const git_error *error = giterr_last();
+                if (error)
+                  _tcslcpy(xTrgt,error->message,maxlen-1);
+                else
+                  _tcslcpy(xTrgt,"unchanged",maxlen-1);
               }
-              break;
+            }
+            else if (xDirectory && xWant==EGeneralStatus)
+            {
+              _tcslcpy((TCHAR*)FieldValue,"GIT dir",maxlen-1);
             }
           }
-        }
+          else //info o commitu
+          {
+            //EMsg,EAuthor,EMail,EDate,EAge
+            //EThisCommit,ELastAffecting,ELastFallthrough
+
+            if (xWantFrom==ELastAffecting && xFilesCommit==NULL)
+            {
+              xReturnEmpty=true;
+            }
+            else
+            {
+              git_commit * xPtrUse;
+              if (xWantFrom==EThisCommit || (xWantFrom==ELastFallthrough && xFilesCommit==NULL))
+                xPtrUse=commit;
+              else
+                xPtrUse=xFilesCommit;
+
+              if ( !xPtrUse )
+                xReturnEmpty=true;
+              else
+              {
+
+                switch (xWant)
+                {              //EMsg,EAuthor,EMail,EDate,EAge
+                  case EFallIsThis:
+                  {
+                    if (xPtrUse==commit)
+                      _tcslcpy((TCHAR*)FieldValue,"This commit",maxlen-1);
+                    else
+                      _tcslcpy((TCHAR*)FieldValue,"Last affecting",maxlen-1);
+                  }
+                  break;
+                  case EMsg: //git last commitmessage
+                  {
+                    char *xCMsg=(char*)git_commit_summary(xPtrUse);//whole message: git_commit_message
+                    _tcslcpy((TCHAR*)FieldValue,xCMsg,maxlen-1);
+                  }
+                  break;
+                  case EAuthor: //"CommitAuthor"
+                  case EMail:
+                  {
+                    const git_signature *xSig=git_commit_author(xPtrUse);
+                    if (xSig)
+                    {
+                      switch (xWant)
+                      {
+                        case EAuthor:        //name
+                          _tcslcpy((TCHAR*)FieldValue,xSig->name,maxlen-1);
+                        break;
+                        case EMail:       //email
+                          _tcslcpy((TCHAR*)FieldValue,xSig->email,maxlen-1);
+                        break;
+                      }
+                    }
+                  }
+                  break;
+                  case EDate: //"CommitDatetime"
+                  {
+                    git_time_t comtim=git_commit_time(xPtrUse);
+                    int origoffset=git_commit_time_offset(xPtrUse);
+                    TimetToFileTime(comtim, ((FILETIME*)FieldValue));
+                  }
+                  break;
+                  case EAge: //"CommitAge"
+                  {
+                    git_time_t comtim=git_commit_time(xPtrUse);
+                    time_t xNow;
+                    time(&xNow);
+                    double xAgo=difftime(xNow, comtim);//difference in seconds
+                    PrintTimeAgo((TCHAR*)FieldValue,xAgo,maxlen);
+                  }
+                  break;
+                }
+              }//else if not null
+            }
+          }
+        }//was not a predetectionof error
 
         //cleanup:
         if (xFilesCommit)

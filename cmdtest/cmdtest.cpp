@@ -204,8 +204,8 @@ int _tmain(int argc, _TCHAR* argv[])
   int maxlen = 2048;
   // char FileName[]="d:\\Data\\Projects\\WinMedicalc\\WMPacs\\WMPacsViewer\\dFirst.cpp";
   char FileName[] =
-    "d:\\Data\\Projects\\WinMedicalc\\WMPacs\\WMPacsViewer\\buildshaders.bat";
-  char FileName2[] = "buildshaders.bat";
+    "d:\\Data\\Projects\\repoempty\\ictamxs.sty";
+  char FileName2[] = "ictamxs.sty";
   WIN32_FIND_DATA fd;
   fd.dwFileAttributes = 0; // FILE_ATTRIBUTE_DIRECTORY;
   git_repository *repo = CheckRepo(fd, FileName, xRet, true, &xPtrFN);

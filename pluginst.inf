@@ -1,0 +1,5 @@
+[plugininstall] 
+description=Git Commander
+type=wdx 
+file=gitcmd.wdx 
+defaultdir=gitcmd

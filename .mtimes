@@ -1,10 +1,15 @@
+1427181044|"libgit2-0.22.2/tests/resources/status/\350\277\231"
 1428998271|GitCommanderBDSXE.groupproj
 1428998272|GitCommanderBDSXE.groupproj.local
 1428998272|ProjectGroup1.groupproj
 1428998272|ProjectGroup1.groupproj.local
-1429020378|cmdtest/cmdtest.cpp
+1429088691|README.md
+1429792841|Release.zip
+1429790984|cmdtest/cmdtest.cpp
 1428996318|cmdtest/projtest.cbproj
 1428996320|cmdtest/projtest.cbproj.local
+1429045258|gitcmd.cbproj
+1429792768|gitcmd.cpp
 1427181044|libgit2-0.22.2/.HEADER
 1427181044|libgit2-0.22.2/.editorconfig
 1427181044|libgit2-0.22.2/.mailmap
@@ -875,7 +880,6 @@
 1427181044|libgit2-0.22.2/tests/resources/status/subdir/current_file
 1427181044|libgit2-0.22.2/tests/resources/status/subdir/modified_file
 1427181044|libgit2-0.22.2/tests/resources/status/subdir/new_file
-1427181044|"libgit2-0.22.2/tests/resources/status/\350\277\231"
 1427181044|libgit2-0.22.2/tests/resources/submod2/README.txt
 1427181044|libgit2-0.22.2/tests/resources/submod2/gitmodules
 1427181044|libgit2-0.22.2/tests/resources/submod2/just_a_dir/contents
@@ -977,8 +981,5 @@
 1427181044|libgit2-0.22.2/tests/trace/trace.c
 1427181044|libgit2-0.22.2/tests/transport/register.c
 1427181044|libgit2-0.22.2/tests/valgrind-supp-mac.txt
+1429088418|pluginst.inf
 1428998878|uGitForBCB.h
-1429045258|gitcmd.cbproj
-1429047622|gitcmd.cpp
-1429088423|Release.zip
-1429088691|README.md
